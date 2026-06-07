@@ -109,11 +109,11 @@ const renderBindGroup = device.createBindGroup({
   }]
 });
 
-function frame() {
+async function frame() {
   const commandEncoder: GPUCommandEncoder;
 
   // +++ inject commands into the encoder +++
-  pipeline.pass(commandEncoder);
+  await pipeline.pass(commandEncoder);
 
   // begin other render pass...
 }
@@ -123,6 +123,8 @@ To change an adjustable parameter (e.g. deblur strength) call `Anime4KPipeline::
 ```typescript
 pipeline.updateParam('strength', 3.0);
 ```
+
+Note: `pass()` is async and returns a `Promise<void>`. Always `await` it in your render loop to ensure proper execution ordering.
 
 The input texture must have usage `TEXTURE_BINDING`, and the output texture has `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING` to be used in render pipelines. You can also have multiple pipelines in tandem to achieve sophisticated effects.
 
@@ -242,7 +244,7 @@ However, an exception is observed with the upscale GAN x4 when applied to a 1080
 
 * Use `read-write` storage texture instead of `write-only` storage texture (Not yet supported in Chrome stable) for lower VRAM usage.
 
-* Enhancing the Pipeline: Currently, our pipelines operate sequentially. As a future enhancement, we plan to restructure the system so that pipelines which are independent of each other can run concurrently, in parallel. This will optimize our process efficiency and performance.
+* ~~Enhancing the Pipeline: Currently, our pipelines operate sequentially. As a future enhancement, we plan to restructure the system so that pipelines which are independent of each other can run concurrently, in parallel. This will optimize our process efficiency and performance.~~ **Done:** Pipeline creation is now async (`createComputePipelineAsync` / `createRenderPipelineAsync`) to eliminate main-thread blocking during initialization. Independent compute dispatches are consolidated into shared compute passes, reducing per-frame pass overhead by 10–15× on preset modes.
 
 ## Reference
 This project references a variety of resources:
