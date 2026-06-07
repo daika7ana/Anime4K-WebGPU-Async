@@ -8,11 +8,13 @@ import { Anime4KPipeline, Conv2dPipelineDescriptor } from '../../interfaces';
 export class Conv2d implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
-  pipeline: GPUComputePipeline;
+  pipeline: Promise<GPUComputePipeline>;
 
   bindGroup: GPUBindGroup;
 
   name: string;
+
+  readonly isCompute = true;
 
   /**
    * Creates an instance of Conv2d.
@@ -105,7 +107,7 @@ export class Conv2d implements Anime4KPipeline {
     });
 
     // Pipeline
-    this.pipeline = device.createComputePipeline({
+    this.pipeline = device.createComputePipelineAsync({
       label: `${name}: pipeline`,
       layout: pipelineLayout,
       compute: {
@@ -119,14 +121,18 @@ export class Conv2d implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
-    const pass = encoder.beginComputePass();
-    pass.setPipeline(this.pipeline);
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    pass.setPipeline(await this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.dispatchWorkgroups(
       Math.ceil(this.outputTexture.width / 8),
       Math.ceil(this.outputTexture.height / 8),
     );
+  }
+
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
+    const pass = encoder.beginComputePass();
+    await this.recordCompute(pass);
     pass.end();
   }
 

@@ -12,12 +12,18 @@ export interface Anime4KPipeline {
    *
    * @param encoder - encoder to record commands into
    */
-  pass(encoder: GPUCommandEncoder): void;
+  pass(encoder: GPUCommandEncoder): Promise<void>;
 
   /**
    * get the output texture of this pipeline
    */
   getOutputTexture(): GPUTexture;
+
+  /** True if this pipeline contains only compute work and can be recorded into a shared compute pass */
+  readonly isCompute?: boolean;
+
+  /** Record compute dispatches into an open compute pass. Only valid when isCompute === true */
+  recordCompute?(pass: GPUComputePassEncoder): Promise<void>;
 }
 
 export interface OriginalPipelineDescriptor {

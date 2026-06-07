@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.0.0] - 2026-6-7
+
+### Changed
+- **Breaking.** `Anime4KPipeline.pass()` is now `async` and returns `Promise<void>`. All callers must `await` the call.
+- Pipeline creation uses `createComputePipelineAsync()` / `createRenderPipelineAsync()` to eliminate main-thread blocking during initialization (2–3s UI freeze removed).
+- Same-resolution `Overlay` now uses a compute pipeline instead of a render pipeline.
+- Composite pipelines batch compute dispatches into shared `beginComputePass()` calls, reducing per-frame pass overhead by 10–15× on preset modes.
+- `DepthToSpace` dispatch corrected from `ceil(dim/4)` to `ceil(dim/8)` to match `@workgroup_size(8,8)`.
+- Renderer now has a backpressure guard to prevent unbounded GPU queue buildup.
+
+### Added
+- `isCompute` and `recordCompute()` on `Anime4KPipeline` interface for compute pass consolidation.
+- `overlay2_compute.wgsl` shader for same-resolution overlay via compute.
+
 ## [1.0.0] - 2024-6-6
  
 ### Added

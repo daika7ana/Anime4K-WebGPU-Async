@@ -4,11 +4,13 @@ import { Anime4KPipeline, DepthToSpacePipelineDescriptor } from '../../interface
 export class DepthToSpace implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
-  pipeline: GPUComputePipeline;
+  pipeline: Promise<GPUComputePipeline>;
 
   bindGroup: GPUBindGroup;
 
   name: string;
+
+  readonly isCompute = true;
 
   /**
    * Creates an instance of DepthToSpace.
@@ -85,7 +87,7 @@ export class DepthToSpace implements Anime4KPipeline {
     });
 
     // pipeline
-    this.pipeline = device.createComputePipeline({
+    this.pipeline = device.createComputePipelineAsync({
       label: 'depth to space pipeline',
       layout: pipelinelayout,
       compute: {
@@ -122,14 +124,18 @@ export class DepthToSpace implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
-    const depthToSpacePass = encoder.beginComputePass();
-    depthToSpacePass.setPipeline(this.pipeline);
-    depthToSpacePass.setBindGroup(0, this.bindGroup);
-    depthToSpacePass.dispatchWorkgroups(
-      Math.ceil(this.outputTexture.width / 4),
-      Math.ceil(this.outputTexture.height / 4),
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    pass.setPipeline(await this.pipeline);
+    pass.setBindGroup(0, this.bindGroup);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.outputTexture.width / 8),
+      Math.ceil(this.outputTexture.height / 8),
     );
+  }
+
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
+    const depthToSpacePass = encoder.beginComputePass();
+    await this.recordCompute(depthToSpacePass);
     depthToSpacePass.end();
   }
 

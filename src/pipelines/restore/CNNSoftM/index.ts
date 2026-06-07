@@ -78,10 +78,20 @@ export class CNNSoftM implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
-    for (let i = 0; i < this.pipelines.length; i += 1) {
-      this.pipelines[i].pass(encoder);
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
+    let computePass: GPUComputePassEncoder | null = null;
+
+    for (const p of this.pipelines) {
+      if (p.isCompute) {
+        if (!computePass) computePass = encoder.beginComputePass();
+        await p.recordCompute!(computePass);
+      } else {
+        if (computePass) { computePass.end(); computePass = null; }
+        await p.pass(encoder);
+      }
     }
+
+    if (computePass) computePass.end();
   }
 
   getOutputTexture(): GPUTexture {

@@ -175,14 +175,14 @@ export const ReactWebGPU: React.FC = () => {
 
 
       // render loop
-      function frame() {
+      async function frame() {
         if (!video.paused) {
           updateVideoFrameTexture();
         }
         const commandEncoder = device.createCommandEncoder();
         // +++ Anime4K +++
-        upscalePipeline.pass(commandEncoder);
-        restorePipeline.pass(commandEncoder);
+        await upscalePipeline.pass(commandEncoder);
+        await restorePipeline.pass(commandEncoder);
         // +++ Anime4K +++
         const passEncoder = commandEncoder.beginRenderPass({
           colorAttachments: [

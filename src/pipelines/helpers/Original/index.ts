@@ -7,6 +7,8 @@ import { Anime4KPipeline, OriginalPipelineDescriptor } from '../../interfaces';
 export class Original implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
+  readonly isCompute = true;
+
   /**
    * Creates an instance of Original.
    *
@@ -23,7 +25,11 @@ export class Original implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async recordCompute(_pass: GPUComputePassEncoder): Promise<void> {
+    // no-op — Original is a pass-through
+  }
+
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
   }
 
   getOutputTexture(): GPUTexture {
