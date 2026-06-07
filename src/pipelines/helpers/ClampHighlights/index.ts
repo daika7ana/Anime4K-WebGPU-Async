@@ -7,9 +7,9 @@ export class ClampHighlights implements Anime4KPipeline {
   name: string;
 
   pipelines: {
-    luminationXPipeline: GPUComputePipeline,
-    luminationYPipeline: GPUComputePipeline,
-    clampPipeline: GPUComputePipeline,
+    luminationXPipeline: Promise<GPUComputePipeline>,
+    luminationYPipeline: Promise<GPUComputePipeline>,
+    clampPipeline: Promise<GPUComputePipeline>,
   };
 
   bindGroups: {
@@ -120,7 +120,7 @@ export class ClampHighlights implements Anime4KPipeline {
       bindGroupLayouts: [clampBindGroupLayout],
     });
 
-    const luminationXPipeline = device.createComputePipeline({
+    const luminationXPipeline = device.createComputePipelineAsync({
       label: `${name} luminationX pipeline`,
       layout: luminationPipelineLayout,
       compute: {
@@ -129,7 +129,7 @@ export class ClampHighlights implements Anime4KPipeline {
       },
     });
 
-    const luminationYPipeline = device.createComputePipeline({
+    const luminationYPipeline = device.createComputePipelineAsync({
       label: `${name} luminationY pipeline`,
       layout: luminationPipelineLayout,
       compute: {
@@ -138,7 +138,7 @@ export class ClampHighlights implements Anime4KPipeline {
       },
     });
 
-    const clampPipeline = device.createComputePipeline({
+    const clampPipeline = device.createComputePipelineAsync({
       label: `${name} clamp pipeline`,
       layout: clampPipelineLayout,
       compute: {
@@ -213,9 +213,9 @@ export class ClampHighlights implements Anime4KPipeline {
     throw new Error(`${this.name} has no param.`);
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     const luminationXPass = encoder.beginComputePass();
-    luminationXPass.setPipeline(this.pipelines.luminationXPipeline);
+    luminationXPass.setPipeline(await this.pipelines.luminationXPipeline);
     luminationXPass.setBindGroup(0, this.bindGroups.luminationXBindGroup);
     luminationXPass.dispatchWorkgroups(
       Math.ceil(this.outputTexture.width / 8),
@@ -224,7 +224,7 @@ export class ClampHighlights implements Anime4KPipeline {
     luminationXPass.end();
 
     const luminationYPass = encoder.beginComputePass();
-    luminationYPass.setPipeline(this.pipelines.luminationYPipeline);
+    luminationYPass.setPipeline(await this.pipelines.luminationYPipeline);
     luminationYPass.setBindGroup(0, this.bindGroups.luminationYBindGroup);
     luminationYPass.dispatchWorkgroups(
       Math.ceil(this.outputTexture.width / 8),
@@ -233,7 +233,7 @@ export class ClampHighlights implements Anime4KPipeline {
     luminationYPass.end();
 
     const clampPass = encoder.beginComputePass();
-    clampPass.setPipeline(this.pipelines.clampPipeline);
+    clampPass.setPipeline(await this.pipelines.clampPipeline);
     clampPass.setBindGroup(0, this.bindGroups.clampBindGroup);
     clampPass.dispatchWorkgroups(
       Math.ceil(this.outputTexture.width / 8),

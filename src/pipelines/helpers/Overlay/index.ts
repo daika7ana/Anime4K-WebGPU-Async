@@ -9,7 +9,7 @@ import overlay2WGSL from './shaders/overlay2.wgsl';
 export class Overlay implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
-  pipeline: GPURenderPipeline;
+  pipeline: Promise<GPURenderPipeline>;
 
   bindGroup: GPUBindGroup;
 
@@ -90,7 +90,7 @@ export class Overlay implements Anime4KPipeline {
     });
 
     // Pipeline
-    this.pipeline = device.createRenderPipeline({
+    this.pipeline = device.createRenderPipelineAsync({
       layout: pipelineLayout,
       vertex: {
         module: vertexModule,
@@ -139,7 +139,7 @@ export class Overlay implements Anime4KPipeline {
     throw new Error(`${this.constructor.name} has no param`);
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     const bilinearPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -152,7 +152,7 @@ export class Overlay implements Anime4KPipeline {
         },
       ],
     });
-    bilinearPass.setPipeline(this.pipeline);
+    bilinearPass.setPipeline(await this.pipeline);
     bilinearPass.setBindGroup(0, this.bindGroup);
     bilinearPass.draw(6);
     bilinearPass.end();

@@ -125,9 +125,9 @@ export class CNNx2UL implements Anime4KPipeline {
     return this.pipelines[this.pipelines.length - 1].getOutputTexture();
   }
 
-  pass(encoder: GPUCommandEncoder) {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     for (let i = 0; i < this.pipelines.length; i += 1) {
-      this.pipelines[i].pass(encoder);
+      await this.pipelines[i].pass(encoder);
     }
   }
 }

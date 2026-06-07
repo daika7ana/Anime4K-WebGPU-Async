@@ -23,7 +23,7 @@ export class Original implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
   }
 
   getOutputTexture(): GPUTexture {

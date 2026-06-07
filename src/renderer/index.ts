@@ -92,7 +92,7 @@ export async function render(options: RendererOptions): Promise<void> {
     bindGroupLayouts: [renderBindGroupLayout],
   });
 
-  const renderPipeline = device.createRenderPipeline({
+  const renderPipeline = device.createRenderPipelineAsync({
     layout: renderPipelineLayout,
     vertex: {
       module: device.createShaderModule({
@@ -136,14 +136,14 @@ export async function render(options: RendererOptions): Promise<void> {
   });
 
   // render loop
-  function frame() {
+  async function frame() {
     if (!video.paused) {
       updateVideoFrameTexture();
     }
     const commandEncoder = device.createCommandEncoder();
-    pipelines.forEach((pipeline) => {
-      pipeline.pass(commandEncoder);
-    });
+    for (const pipeline of pipelines) {
+      await pipeline.pass(commandEncoder);
+    }
     const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
@@ -156,7 +156,7 @@ export async function render(options: RendererOptions): Promise<void> {
         },
       ],
     });
-    passEncoder.setPipeline(renderPipeline);
+    passEncoder.setPipeline(await renderPipeline);
     passEncoder.setBindGroup(0, renderBindGroup);
     passEncoder.draw(6);
     passEncoder.end();

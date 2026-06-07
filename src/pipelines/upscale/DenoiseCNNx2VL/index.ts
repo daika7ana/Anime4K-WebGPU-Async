@@ -97,9 +97,9 @@ export class DenoiseCNNx2VL implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     for (let i = 0; i < this.pipelines.length; i += 1) {
-      this.pipelines[i].pass(encoder);
+      await this.pipelines[i].pass(encoder);
     }
   }
 

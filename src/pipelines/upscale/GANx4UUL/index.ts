@@ -299,23 +299,23 @@ export class GANx4UUL implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     for (let i = 0; i < 9; i += 1) {
       for (let j = 0; j < 6; j += 1) {
-        this.pipelines6[6 * i + j].pass(encoder);
+        await this.pipelines6[6 * i + j].pass(encoder);
       }
 
       if (i !== 8) {
-        this.pipelines[2 * i].pass(encoder);
-        this.pipelines[2 * i + 1].pass(encoder);
+        await this.pipelines[2 * i].pass(encoder);
+        await this.pipelines[2 * i + 1].pass(encoder);
       }
     }
 
     // conv2d_25_tf
-    this.pipelines[16].pass(encoder);
+    await this.pipelines[16].pass(encoder);
 
     for (let i = 0; i < this.pipelinesUps.length; i += 1) {
-      this.pipelinesUps[i].pass(encoder);
+      await this.pipelinesUps[i].pass(encoder);
     }
   }
 

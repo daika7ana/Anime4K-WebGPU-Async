@@ -5,7 +5,7 @@ import fragmentWGSL from './shaders/fragment.wgsl';
 export class Downscale implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
-  pipeline: GPURenderPipeline;
+  pipeline: Promise<GPURenderPipeline>;
 
   bindGroup: GPUBindGroup;
 
@@ -61,7 +61,7 @@ export class Downscale implements Anime4KPipeline {
       bindGroupLayouts: [renderBindGroupLayout],
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.pipeline = device.createRenderPipelineAsync({
       layout: renderPipelineLayout,
       vertex: {
         module: vertexModule,
@@ -105,7 +105,7 @@ export class Downscale implements Anime4KPipeline {
     throw new Error(`${this.name} has no param`);
   }
 
-  pass(encoder: GPUCommandEncoder): void {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -118,7 +118,7 @@ export class Downscale implements Anime4KPipeline {
         },
       ],
     });
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(await this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.draw(6);
     pass.end();

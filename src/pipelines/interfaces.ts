@@ -12,7 +12,7 @@ export interface Anime4KPipeline {
    *
    * @param encoder - encoder to record commands into
    */
-  pass(encoder: GPUCommandEncoder): void;
+  pass(encoder: GPUCommandEncoder): Promise<void>;
 
   /**
    * get the output texture of this pipeline

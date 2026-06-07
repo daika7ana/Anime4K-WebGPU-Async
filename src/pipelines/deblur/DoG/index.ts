@@ -15,7 +15,7 @@ export class DoG implements Anime4KPipeline {
 
   pipelineLayouts: GPUPipelineLayout[];
 
-  pipelines: GPUComputePipeline[];
+  pipelines: Promise<GPUComputePipeline>[];
 
   strengthBuffer: GPUBuffer;
 
@@ -66,7 +66,7 @@ export class DoG implements Anime4KPipeline {
       bindGroupLayouts: [luminationBindGroupLayout],
     });
 
-    const luminationPipeline = device.createComputePipeline({
+    const luminationPipeline = device.createComputePipelineAsync({
       label: 'lumination pipeline',
       layout: luminationPipelineLayout,
       compute: {
@@ -112,7 +112,7 @@ export class DoG implements Anime4KPipeline {
       bindGroupLayouts: [deblurDoGXBindGroupLayout],
     });
 
-    const deblurDoGXPipeline = device.createComputePipeline({
+    const deblurDoGXPipeline = device.createComputePipelineAsync({
       label: 'deblurDoGX pipeline',
       layout: deblurDoGXPipelineLayout,
       compute: {
@@ -158,7 +158,7 @@ export class DoG implements Anime4KPipeline {
       bindGroupLayouts: [deblurDoGYBindGroupLayout],
     });
 
-    const deblurDoGYPipeline = device.createComputePipeline({
+    const deblurDoGYPipeline = device.createComputePipelineAsync({
       label: 'deblurDoGY pipeline',
       layout: deblurDoGYPipelineLayout,
       compute: {
@@ -219,7 +219,7 @@ export class DoG implements Anime4KPipeline {
       bindGroupLayouts: [deblurDoGApplyBindGroupLayout],
     });
 
-    const deblurDoGApplyPipeline = device.createComputePipeline({
+    const deblurDoGApplyPipeline = device.createComputePipelineAsync({
       label: 'deblurDoGApply pipeline',
       layout: deblurDoGApplyPipelineLayout,
       compute: {
@@ -376,10 +376,10 @@ export class DoG implements Anime4KPipeline {
     this.device.queue.writeBuffer(this.strengthBuffer, 0, new Float32Array([value]));
   }
 
-  pass(encoder: GPUCommandEncoder) {
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
     // dispatch lumination pipeline
     const luminationPass = encoder.beginComputePass();
-    luminationPass.setPipeline(this.pipelines[0]);
+    luminationPass.setPipeline(await this.pipelines[0]);
     luminationPass.setBindGroup(0, this.bindGroups[0]);
     luminationPass.dispatchWorkgroups(
       Math.ceil(this.inputTexWidth / 8),
@@ -389,7 +389,7 @@ export class DoG implements Anime4KPipeline {
 
     // dispatch deblurDoGX pipeline
     const deblurDoGXPass = encoder.beginComputePass();
-    deblurDoGXPass.setPipeline(this.pipelines[1]);
+    deblurDoGXPass.setPipeline(await this.pipelines[1]);
     deblurDoGXPass.setBindGroup(0, this.bindGroups[1]);
     deblurDoGXPass.dispatchWorkgroups(
       Math.ceil(this.inputTexWidth / 8),
@@ -399,7 +399,7 @@ export class DoG implements Anime4KPipeline {
 
     // dispatch deblurDoGY pipeline
     const deblurDoGYPass = encoder.beginComputePass();
-    deblurDoGYPass.setPipeline(this.pipelines[2]);
+    deblurDoGYPass.setPipeline(await this.pipelines[2]);
     deblurDoGYPass.setBindGroup(0, this.bindGroups[2]);
     deblurDoGYPass.dispatchWorkgroups(
       Math.ceil(this.inputTexWidth / 8),
@@ -409,7 +409,7 @@ export class DoG implements Anime4KPipeline {
 
     // dispatch deblurDoGApply pipeline
     const deblurDoGApplyPass = encoder.beginComputePass();
-    deblurDoGApplyPass.setPipeline(this.pipelines[3]);
+    deblurDoGApplyPass.setPipeline(await this.pipelines[3]);
     deblurDoGApplyPass.setBindGroup(0, this.bindGroups[3]);
     deblurDoGApplyPass.dispatchWorkgroups(
       Math.ceil(this.inputTexWidth / 8),
