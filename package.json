@@ -1,5 +1,5 @@
 {
-  "name": "anime4k-webgpu",
+  "name": "anime4k-webgpu-async",
   "version": "2.0.0",
   "description": "Anime4K WebGPU port",
   "main": "lib/index.js",
@@ -23,7 +23,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Anime4KWebBoost/Anime4K-WebGPU.git"
+    "url": "git+https://github.com/daika7ana/Anime4K-WebGPU-Async.git"
   },
   "keywords": [
     "upscale",
@@ -35,9 +35,9 @@
   "author": "Anime4KWebBoost Team",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Anime4KWebBoost/Anime4K-WebGPU/issues"
+    "url": "https://github.com/daika7ana/Anime4K-WebGPU-Async/issues"
   },
-  "homepage": "https://github.com/Anime4KWebBoost/Anime4K-WebGPU#readme",
+  "homepage": "https://github.com/daika7ana/Anime4K-WebGPU-Async#readme",
   "peerDependencies": {
     "@webgpu/types": "^0.1.38"
   },

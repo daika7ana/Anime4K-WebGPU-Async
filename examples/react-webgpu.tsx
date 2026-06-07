@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { CNNUL, CNNx2UL } from 'anime4k-webgpu';
+import { CNNUL, CNNx2UL } from 'anime4k-webgpu-async';
 
 const fullscreenTexturedQuadWGSL = `
 struct VertexOutput {

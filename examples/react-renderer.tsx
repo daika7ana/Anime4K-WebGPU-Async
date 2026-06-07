@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { CNNx2UL, GANUUL, render } from 'anime4k-webgpu';
+import { CNNx2UL, GANUUL, render } from 'anime4k-webgpu-async';
 
 export const ReactRenderer: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);

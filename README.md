@@ -1,4 +1,4 @@
-# Anime4K-WebGPU
+# Anime4K-WebGPU-Async
 
 University of Pennsylvania, CIS 565: GPU Programming and Architecture, Final Project
 
@@ -10,7 +10,7 @@ Authors (alphabetical order with equal contribution):
 ## Introduction
 ![image](images/intro.gif)
 
-An [Anime4K](https://github.com/bloc97/Anime4K) implementation for WebGPU, featuring video enhancements including upscaling, denoising, and deblurring. Computing is done entirely on the client side using WebGPU compute shaders. Functionality of this implementation is published as an [NPM package](https://www.npmjs.com/package/anime4k-webgpu), and can be easily incorporated into your WebGPU pipeline.
+An [Anime4K](https://github.com/bloc97/Anime4K) implementation for WebGPU, featuring video enhancements including upscaling, denoising, and deblurring. Computing is done entirely on the client side using WebGPU compute shaders. Functionality of this implementation is published as an [NPM package](https://www.npmjs.com/package/anime4k-webgpu-async), and can be easily incorporated into your WebGPU pipeline.
 
 Take a look at our web demo at https://anime4k-webgpu-demo.fly.dev/ ([Source](https://github.com/Anime4KWebBoost/Anime4K-Web-Demo))
 
@@ -27,7 +27,7 @@ This is for frontend devs who do not wish to tap into WebGPU too much. An React 
 You only need the `render` function which will setup all the rendering from a video element to a canvas element:
 
 ```typescript
-import { CNNx2UL, GANUUL, render } from 'anime4k-webgpu';
+import { CNNx2UL, GANUUL, render } from 'anime4k-webgpu-async';
 
 await render({
   // your source video HTMLElement
@@ -56,7 +56,7 @@ In the upper example, the input texture (vide) will go through a `CNNx2UL` for u
 Alternativey, to use a [preset mode](https://github.com/bloc97/Anime4K/blob/master/md/GLSL_Instructions_Advanced.md), native texture resolution and render target resolution are needed to setup the correct pipeline combinations:
 
 ```typescript
-import { ModeA, render } from 'anime4k-webgpu';
+import { ModeA, render } from 'anime4k-webgpu-async';
 
 await render({
   video,
@@ -84,11 +84,11 @@ await render({
 
 If you already have a webGPU render pipeline setup and would like to use Anime4K on an existing texture, 
 
-This package contains classes that implements interface `Anime4KPipeline`. To use these classes, first install `anime4k-webgpu` package, then insert proveded pipelines in 4 lines:
+This package contains classes that implements interface `Anime4KPipeline`. To use these classes, first install `anime4k-webgpu-async` package, then insert proveded pipelines in 4 lines:
 
 ```typescript
 // +++ import CNNx2UL, one of the CNN upscale pipeline +++
-import { Anime4KPipeline, CNNx2UL } from 'anime4k-webgpu';
+import { Anime4KPipeline, CNNx2UL } from 'anime4k-webgpu-async';
 
 // your original texture to be processed
 const inputTexture: GPUTexture;
