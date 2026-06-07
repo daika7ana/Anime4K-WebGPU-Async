@@ -27,6 +27,8 @@ export class DoG implements Anime4KPipeline {
 
   device: GPUDevice;
 
+  readonly isCompute = true;
+
   constructor({
     device,
     inputTexture,
@@ -376,45 +378,43 @@ export class DoG implements Anime4KPipeline {
     this.device.queue.writeBuffer(this.strengthBuffer, 0, new Float32Array([value]));
   }
 
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    // lumination
+    pass.setPipeline(await this.pipelines[0]);
+    pass.setBindGroup(0, this.bindGroups[0]);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.inputTexWidth / 8),
+      Math.ceil(this.inputTexHeight / 8),
+    );
+
+    // deblurDoGX
+    pass.setPipeline(await this.pipelines[1]);
+    pass.setBindGroup(0, this.bindGroups[1]);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.inputTexWidth / 8),
+      Math.ceil(this.inputTexHeight / 8),
+    );
+
+    // deblurDoGY
+    pass.setPipeline(await this.pipelines[2]);
+    pass.setBindGroup(0, this.bindGroups[2]);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.inputTexWidth / 8),
+      Math.ceil(this.inputTexHeight / 8),
+    );
+
+    // deblurDoGApply
+    pass.setPipeline(await this.pipelines[3]);
+    pass.setBindGroup(0, this.bindGroups[3]);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.inputTexWidth / 8),
+      Math.ceil(this.inputTexHeight / 8),
+    );
+  }
+
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    // dispatch lumination pipeline
-    const luminationPass = encoder.beginComputePass();
-    luminationPass.setPipeline(await this.pipelines[0]);
-    luminationPass.setBindGroup(0, this.bindGroups[0]);
-    luminationPass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
-    luminationPass.end();
-
-    // dispatch deblurDoGX pipeline
-    const deblurDoGXPass = encoder.beginComputePass();
-    deblurDoGXPass.setPipeline(await this.pipelines[1]);
-    deblurDoGXPass.setBindGroup(0, this.bindGroups[1]);
-    deblurDoGXPass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
-    deblurDoGXPass.end();
-
-    // dispatch deblurDoGY pipeline
-    const deblurDoGYPass = encoder.beginComputePass();
-    deblurDoGYPass.setPipeline(await this.pipelines[2]);
-    deblurDoGYPass.setBindGroup(0, this.bindGroups[2]);
-    deblurDoGYPass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
-    deblurDoGYPass.end();
-
-    // dispatch deblurDoGApply pipeline
-    const deblurDoGApplyPass = encoder.beginComputePass();
-    deblurDoGApplyPass.setPipeline(await this.pipelines[3]);
-    deblurDoGApplyPass.setBindGroup(0, this.bindGroups[3]);
-    deblurDoGApplyPass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
-    deblurDoGApplyPass.end();
+    const computePass = encoder.beginComputePass();
+    await this.recordCompute(computePass);
+    computePass.end();
   }
 }

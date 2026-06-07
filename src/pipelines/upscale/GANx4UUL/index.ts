@@ -300,23 +300,39 @@ export class GANx4UUL implements Anime4KPipeline {
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    for (let i = 0; i < 9; i += 1) {
-      for (let j = 0; j < 6; j += 1) {
-        await this.pipelines6[6 * i + j].pass(encoder);
-      }
+    let computePass: GPUComputePassEncoder | null = null;
 
-      if (i !== 8) {
-        await this.pipelines[2 * i].pass(encoder);
-        await this.pipelines[2 * i + 1].pass(encoder);
+    for (const p of this.pipelines6) {
+      if (p.isCompute) {
+        if (!computePass) computePass = encoder.beginComputePass();
+        await p.recordCompute!(computePass);
+      } else {
+        if (computePass) { computePass.end(); computePass = null; }
+        await p.pass(encoder);
       }
     }
 
-    // conv2d_25_tf
-    await this.pipelines[16].pass(encoder);
-
-    for (let i = 0; i < this.pipelinesUps.length; i += 1) {
-      await this.pipelinesUps[i].pass(encoder);
+    for (const p of this.pipelines) {
+      if (p.isCompute) {
+        if (!computePass) computePass = encoder.beginComputePass();
+        await p.recordCompute!(computePass);
+      } else {
+        if (computePass) { computePass.end(); computePass = null; }
+        await p.pass(encoder);
+      }
     }
+
+    for (const p of this.pipelinesUps) {
+      if (p.isCompute) {
+        if (!computePass) computePass = encoder.beginComputePass();
+        await p.recordCompute!(computePass);
+      } else {
+        if (computePass) { computePass.end(); computePass = null; }
+        await p.pass(encoder);
+      }
+    }
+
+    if (computePass) computePass.end();
   }
 
   getOutputTexture(): GPUTexture {

@@ -27,6 +27,8 @@ export class BilateralMean implements Anime4KPipeline {
   // passed in by constructor
   device: GPUDevice;
 
+  readonly isCompute = true;
+
   constructor({
     device,
     inputTexture,
@@ -132,14 +134,18 @@ export class BilateralMean implements Anime4KPipeline {
     this.bindGroup = denoiseMeanBindGroup;
   }
 
-  async pass(encoder: GPUCommandEncoder): Promise<void> {
-    const denoisePass = encoder.beginComputePass();
-    denoisePass.setPipeline(await this.pipeline);
-    denoisePass.setBindGroup(0, this.bindGroup);
-    denoisePass.dispatchWorkgroups(
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    pass.setPipeline(await this.pipeline);
+    pass.setBindGroup(0, this.bindGroup);
+    pass.dispatchWorkgroups(
       Math.ceil(this.inputTexWidth / 8),
       Math.ceil(this.inputTexHeight / 8),
     );
+  }
+
+  async pass(encoder: GPUCommandEncoder): Promise<void> {
+    const denoisePass = encoder.beginComputePass();
+    await this.recordCompute(denoisePass);
     denoisePass.end();
   }
 

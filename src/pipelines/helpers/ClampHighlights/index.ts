@@ -20,6 +20,8 @@ export class ClampHighlights implements Anime4KPipeline {
 
   outputTexture: GPUTexture;
 
+  readonly isCompute = true;
+
   constructor({
     device,
     inputTexture,
@@ -213,33 +215,36 @@ export class ClampHighlights implements Anime4KPipeline {
     throw new Error(`${this.name} has no param.`);
   }
 
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    // luminationX
+    pass.setPipeline(await this.pipelines.luminationXPipeline);
+    pass.setBindGroup(0, this.bindGroups.luminationXBindGroup);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.outputTexture.width / 8),
+      Math.ceil(this.outputTexture.height / 8),
+    );
+
+    // luminationY
+    pass.setPipeline(await this.pipelines.luminationYPipeline);
+    pass.setBindGroup(0, this.bindGroups.luminationYBindGroup);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.outputTexture.width / 8),
+      Math.ceil(this.outputTexture.height / 8),
+    );
+
+    // clamp
+    pass.setPipeline(await this.pipelines.clampPipeline);
+    pass.setBindGroup(0, this.bindGroups.clampBindGroup);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.outputTexture.width / 8),
+      Math.ceil(this.outputTexture.height / 8),
+    );
+  }
+
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    const luminationXPass = encoder.beginComputePass();
-    luminationXPass.setPipeline(await this.pipelines.luminationXPipeline);
-    luminationXPass.setBindGroup(0, this.bindGroups.luminationXBindGroup);
-    luminationXPass.dispatchWorkgroups(
-      Math.ceil(this.outputTexture.width / 8),
-      Math.ceil(this.outputTexture.height / 8),
-    );
-    luminationXPass.end();
-
-    const luminationYPass = encoder.beginComputePass();
-    luminationYPass.setPipeline(await this.pipelines.luminationYPipeline);
-    luminationYPass.setBindGroup(0, this.bindGroups.luminationYBindGroup);
-    luminationYPass.dispatchWorkgroups(
-      Math.ceil(this.outputTexture.width / 8),
-      Math.ceil(this.outputTexture.height / 8),
-    );
-    luminationYPass.end();
-
-    const clampPass = encoder.beginComputePass();
-    clampPass.setPipeline(await this.pipelines.clampPipeline);
-    clampPass.setBindGroup(0, this.bindGroups.clampBindGroup);
-    clampPass.dispatchWorkgroups(
-      Math.ceil(this.outputTexture.width / 8),
-      Math.ceil(this.outputTexture.height / 8),
-    );
-    clampPass.end();
+    const computePass = encoder.beginComputePass();
+    await this.recordCompute(computePass);
+    computePass.end();
   }
 
   getOutputTexture(): GPUTexture {

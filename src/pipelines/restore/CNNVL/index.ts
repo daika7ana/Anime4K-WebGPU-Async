@@ -88,9 +88,19 @@ export class CNNVL implements Anime4KPipeline {
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    for (let i = 0; i < this.pipelines.length; i += 1) {
-      await this.pipelines[i].pass(encoder);
+    let computePass: GPUComputePassEncoder | null = null;
+
+    for (const p of this.pipelines) {
+      if (p.isCompute) {
+        if (!computePass) computePass = encoder.beginComputePass();
+        await p.recordCompute!(computePass);
+      } else {
+        if (computePass) { computePass.end(); computePass = null; }
+        await p.pass(encoder);
+      }
     }
+
+    if (computePass) computePass.end();
   }
 
   getOutputTexture(): GPUTexture {

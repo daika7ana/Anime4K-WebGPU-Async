@@ -136,7 +136,13 @@ export async function render(options: RendererOptions): Promise<void> {
   });
 
   // render loop
+  let pending = false;
   async function frame() {
+    if (pending) {
+      video.requestVideoFrameCallback(frame);
+      return;
+    }
+    pending = true;
     if (!video.paused) {
       updateVideoFrameTexture();
     }
@@ -162,6 +168,7 @@ export async function render(options: RendererOptions): Promise<void> {
     passEncoder.end();
     device.queue.submit([commandEncoder.finish()]);
     video.requestVideoFrameCallback(frame);
+    device.queue.onSubmittedWorkDone().then(() => { pending = false; });
   }
   // start render loop
   video.requestVideoFrameCallback(frame);
