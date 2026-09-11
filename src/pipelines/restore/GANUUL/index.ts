@@ -19,6 +19,7 @@ import output from './shaders/output.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
 import { Conv2d, Overlay } from '../../helpers';
+import { recordPipelineList } from '../../recordPipelineList';
 
 export class GANUUL implements Anime4KPipeline {
   /**
@@ -181,20 +182,12 @@ export class GANUUL implements Anime4KPipeline {
     throw new Error('Method not implemented.');
   }
 
+  getExecutionOrder(): readonly Anime4KPipeline[] {
+    return this.pipelines;
+  }
+
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    let computePass: GPUComputePassEncoder | null = null;
-
-    for (const p of this.pipelines) {
-      if (p.isCompute) {
-        if (!computePass) computePass = encoder.beginComputePass();
-        await p.recordCompute!(computePass);
-      } else {
-        if (computePass) { computePass.end(); computePass = null; }
-        await p.pass(encoder);
-      }
-    }
-
-    if (computePass) computePass.end();
+    await recordPipelineList(encoder, this.pipelines);
   }
 
   getOutputTexture(): GPUTexture {

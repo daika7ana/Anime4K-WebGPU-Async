@@ -1,4 +1,6 @@
 export * from './interfaces';
+export * from './PipelineChain';
+export * from './recordPipelineList';
 export * from './deblur';
 export * from './denoise';
 export * from './helpers';

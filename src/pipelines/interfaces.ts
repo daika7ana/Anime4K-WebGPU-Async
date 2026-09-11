@@ -1,3 +1,8 @@
+export interface Dimensions {
+  width: number;
+  height: number;
+}
+
 export interface Anime4KPipeline {
   /**
    * Update the controllable parameter managed by the pipeline
@@ -19,11 +24,14 @@ export interface Anime4KPipeline {
    */
   getOutputTexture(): GPUTexture;
 
-  /** True if this pipeline contains only compute work and can be recorded into a shared compute pass */
+  /** True when this pipeline contains only compute work and can share a compute pass */
   readonly isCompute?: boolean;
 
   /** Record compute dispatches into an open compute pass. Only valid when isCompute === true */
   recordCompute?(pass: GPUComputePassEncoder): Promise<void>;
+
+  /** Children in exact execution order (opt-in; needed to flatten composites). */
+  getExecutionOrder?(): readonly Anime4KPipeline[];
 }
 
 export interface OriginalPipelineDescriptor {

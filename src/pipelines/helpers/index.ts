@@ -4,3 +4,4 @@ export * from './Overlay';
 export * from './Original';
 export * from './Downscale';
 export * from './ClampHighlights';
+export * from './AutoDownscale';

@@ -25,6 +25,7 @@ import conv2dlasttf2 from './shaders/conv2dlasttf2.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
 import { Conv2d, DepthToSpace, Overlay } from '../../helpers';
+import { recordPipelineList } from '../../recordPipelineList';
 
 export class CNNx2UL implements Anime4KPipeline {
   /**
@@ -125,19 +126,11 @@ export class CNNx2UL implements Anime4KPipeline {
     return this.pipelines[this.pipelines.length - 1].getOutputTexture();
   }
 
+  getExecutionOrder(): readonly Anime4KPipeline[] {
+    return this.pipelines;
+  }
+
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    let computePass: GPUComputePassEncoder | null = null;
-
-    for (const p of this.pipelines) {
-      if (p.isCompute) {
-        if (!computePass) computePass = encoder.beginComputePass();
-        await p.recordCompute!(computePass);
-      } else {
-        if (computePass) { computePass.end(); computePass = null; }
-        await p.pass(encoder);
-      }
-    }
-
-    if (computePass) computePass.end();
+    await recordPipelineList(encoder, this.pipelines);
   }
 }

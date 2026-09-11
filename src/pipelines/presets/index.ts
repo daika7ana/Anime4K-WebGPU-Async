@@ -1,3 +1,4 @@
+export * from './PresetPipeline';
 export * from './ModeA';
 export * from './ModeB';
 export * from './ModeC';

@@ -1,4 +1,4 @@
-import { Anime4KPipeline } from '../pipelines';
+import { Anime4KPipeline, recordPipelineList } from '../pipelines';
 import fullscreenTexturedQuadWGSL from './shaders/fullscreenTexturedQuad.wgsl';
 import sampleExternalTextureWGSL from './shaders/sampleExternalTexture.wgsl';
 
@@ -6,9 +6,17 @@ export interface RendererOptions {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
   // function to build custom pipeline
+  // accepts either a single pipeline (e.g. a container) or an array of pipelines
   pipelineBuilder: (device: GPUDevice, inputTexture: GPUTexture) =>
-  [...Anime4KPipeline[], Anime4KPipeline];
+  Anime4KPipeline | Anime4KPipeline[];
 }
+
+/**
+ * Tracks the active render loop for each video element so that calling
+ * `render()` again on the same video cancels the previous loop instead of
+ * leaving it running alongside the new one.
+ */
+const renderLoops = new WeakMap<HTMLVideoElement, { cancelled: boolean }>();
 
 /**
  * Renders a video using a custom pipeline.
@@ -18,7 +26,7 @@ export interface RendererOptions {
  * @param {HTMLCanvasElement} options.canvas - The canvas element to render to.
  * @param {Function} options.pipelineBuilder - A function that builds the custom pipeline.
  * It takes a GPUDevice and a GPUTexture as parameters
- * and returns an array of Anime4KPipeline instances.
+ * and returns a single Anime4KPipeline or an array of Anime4KPipeline instances.
  * The pipelines returned will be executed in order in the render loop.
  * The output texture of the last pipeline will be rendered to the canvas.
  *
@@ -28,9 +36,19 @@ export interface RendererOptions {
  */
 export async function render(options: RendererOptions): Promise<void> {
   const { video, canvas, pipelineBuilder } = options;
-  if (video.readyState < video.HAVE_FUTURE_DATA) {
+
+  // Cancel any render loop previously started for this video, then register a
+  // fresh token for the loop this call is about to create.
+  const previousLoop = renderLoops.get(video);
+  if (previousLoop) {
+    previousLoop.cancelled = true;
+  }
+  const loopToken = { cancelled: false };
+  renderLoops.set(video, loopToken);
+
+  if (video.readyState < video.HAVE_CURRENT_DATA) {
     await new Promise((resolve) => {
-      video.onloadeddata = resolve;
+      video.addEventListener('loadeddata', resolve, { once: true });
     });
   }
   const WIDTH = video.videoWidth;
@@ -59,7 +77,11 @@ export async function render(options: RendererOptions): Promise<void> {
           | GPUTextureUsage.RENDER_ATTACHMENT,
   });
 
-  const pipelines = pipelineBuilder(device, videoFrameTexture);
+  const built = pipelineBuilder(device, videoFrameTexture);
+  const pipelines = Array.isArray(built) ? built : [built];
+  if (pipelines.length === 0) {
+    throw new Error('pipelineBuilder returned no pipelines');
+  }
 
   // function to get copy new video frame into texture
   function updateVideoFrameTexture() {
@@ -138,38 +160,58 @@ export async function render(options: RendererOptions): Promise<void> {
   // render loop
   let pending = false;
   async function frame() {
+    if (loopToken.cancelled) {
+      return;
+    }
     if (pending) {
-      video.requestVideoFrameCallback(frame);
+      if (!loopToken.cancelled) {
+        video.requestVideoFrameCallback(frame);
+      }
       return;
     }
     pending = true;
-    if (!video.paused) {
-      updateVideoFrameTexture();
-    }
-    const commandEncoder = device.createCommandEncoder();
-    for (const pipeline of pipelines) {
-      await pipeline.pass(commandEncoder);
-    }
-    const passEncoder = commandEncoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: context.getCurrentTexture().createView(),
-          clearValue: {
-            r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+    try {
+      if (!video.paused) {
+        updateVideoFrameTexture();
+      }
+      const commandEncoder = device.createCommandEncoder();
+      await recordPipelineList(commandEncoder, pipelines);
+      const passEncoder = commandEncoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: context.getCurrentTexture().createView(),
+            clearValue: {
+              r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+            },
+            loadOp: 'clear' as GPULoadOp,
+            storeOp: 'store' as GPUStoreOp,
           },
-          loadOp: 'clear' as GPULoadOp,
-          storeOp: 'store' as GPUStoreOp,
-        },
-      ],
-    });
-    passEncoder.setPipeline(await renderPipeline);
-    passEncoder.setBindGroup(0, renderBindGroup);
-    passEncoder.draw(6);
-    passEncoder.end();
-    device.queue.submit([commandEncoder.finish()]);
-    video.requestVideoFrameCallback(frame);
-    device.queue.onSubmittedWorkDone().then(() => { pending = false; });
+        ],
+      });
+      passEncoder.setPipeline(await renderPipeline);
+      passEncoder.setBindGroup(0, renderBindGroup);
+      passEncoder.draw(6);
+      passEncoder.end();
+      if (loopToken.cancelled) {
+        return;
+      }
+      device.queue.submit([commandEncoder.finish()]);
+      device.queue.onSubmittedWorkDone().then(
+        () => { pending = false; },
+        () => { pending = false; },
+      );
+    } catch (error) {
+      pending = false;
+      // eslint-disable-next-line no-console
+      console.error(error);
+    } finally {
+      if (!loopToken.cancelled) {
+        video.requestVideoFrameCallback(frame);
+      }
+    }
   }
   // start render loop
-  video.requestVideoFrameCallback(frame);
+  if (!loopToken.cancelled) {
+    video.requestVideoFrameCallback(frame);
+  }
 }

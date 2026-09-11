@@ -126,7 +126,7 @@ pipeline.updateParam('strength', 3.0);
 
 Note: `pass()` is async and returns a `Promise<void>`. Always `await` it in your render loop to ensure proper execution ordering.
 
-The input texture must have usage `TEXTURE_BINDING`, and the output texture has `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING` to be used in render pipelines. You can also have multiple pipelines in tandem to achieve sophisticated effects.
+The input texture must have usage `TEXTURE_BINDING`. Output texture usage depends on the pipeline: render-based helpers (e.g. `Overlay`, `Downscale`) expose `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING`, while compute-based helpers (e.g. `Conv2d`, `ClampHighlights`) only need `TEXTURE_BINDING | STORAGE_BINDING`. You can also have multiple pipelines in tandem to achieve sophisticated effects.
 
 ### Supported Pipelines
 
@@ -151,8 +151,13 @@ This package currently support the following pipelines and presets (items marked
   * ✅ GANx3L
   * ✅ GANx4UUL
 * Other Helpers
-  * ✅ AutoDownscalePre
+  * ✅ Conv2d
+  * ✅ DepthToSpace
+  * ✅ Overlay
+  * ✅ Original
+  * ✅ Downscale
   * ✅ ClampHighlights
+  * ✅ AutoDownscale
 * Preset Mode Collections (see also [link](https://github.com/bloc97/Anime4K/blob/master/md/GLSL_Instructions_Advanced.md))
   * ✅ ModeA
   * ✅ ModeB
@@ -160,6 +165,8 @@ This package currently support the following pipelines and presets (items marked
   * ✅ ModeAA
   * ✅ ModeBB
   * ✅ ModeCA
+
+The primitives `AutoDownscale`, `planAutoDownscale`, `PipelineChain`, `recordPipelineList`, and `PresetPipeline` are exported for consumers who want to compose their own pipeline chains instead of using the built-in presets.
 
 ## Performance Analysis
 ### Visualization Comparisons

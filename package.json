@@ -1,11 +1,11 @@
 {
   "name": "anime4k-webgpu-async",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Anime4K WebGPU port",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "webpack",
+    "build": "webpack && tsc --emitDeclarationOnly",
     "dev": "nodemon",
     "lint": "eslint . --ext .js,.ts"
   },
@@ -41,6 +41,11 @@
   "peerDependencies": {
     "@webgpu/types": "^0.1.38"
   },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^9.0.9"
+    }
+  },
   "devDependencies": {
     "@types/node": "^20",
     "@typescript-eslint/eslint-plugin": "^6.13.2",
@@ -58,6 +63,7 @@
     "nodemon": "^3.0.2",
     "raw-loader": "^4.0.2",
     "ts-loader": "^9.5.1",
+    "typescript": "~5.3.3",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4"
   }
