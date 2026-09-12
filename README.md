@@ -22,11 +22,87 @@ npm install anime4k-webgpu-async
 Or with your package manager of choice: `pnpm add anime4k-webgpu-async`,
 `yarn add anime4k-webgpu-async`, `bun add anime4k-webgpu-async`.
 
-TypeScript users should also install the peer dependency:
+TypeScript users should also install the peer dependency (modern package managers install peers
+automatically):
 
 ```bash
 npm install -D @webgpu/types
 ```
+
+`@webgpu/types` is the only required peer dependency, and every public declaration — `.`,
+`./engines`, `./engines/anime4k` and `./engines/anime4k/catalog` — begins with
+`/// <reference types="@webgpu/types" />`. That reference loads the peer's ambient WebGPU types
+program-wide, so you do **not** need to add `@webgpu/types` to your `tsconfig` `types`. On
+TypeScript 6+ the built-in `dom` library carries a partial WebGPU set, so keep
+`skipLibCheck: true` to avoid duplicate-declaration errors; TypeScript ≤5 relies on the peer's
+types.
+
+## ESM-only package
+
+Version 3 is **ESM-only**: there is no UMD bundle, no CommonJS build, and no `anime4k-webgpu`
+global. Use `import` — static or dynamic. `<script>` tags, CDN globals and `require()` are no
+longer supported. The package is `"type": "module"` and ships a per-module ESM graph at
+`dist/**`, with `dist/index.js` as the root entry and `dist/index.d.ts` for types.
+
+Static imports work from the root and the engine subpaths:
+
+```typescript
+import { ModeA, render } from 'anime4k-webgpu-async';
+import { ComposedPipeline, createBackendRegistry } from 'anime4k-webgpu-async/engines';
+import { createAnime4kBackend, anime4kPresetPlans } from 'anime4k-webgpu-async/engines/anime4k';
+import { anime4kEffectDescriptors } from 'anime4k-webgpu-async/engines/anime4k/catalog';
+```
+
+The `exports` map exposes `.`, `./engines`, `./engines/anime4k`, `./engines/anime4k/catalog` and
+`./package.json`; consumer tooling must be `exports`-aware (TypeScript ≥4.7). The
+`./engines/anime4k/catalog` subpath is dependency-free catalog data
+(`anime4kEffectDescriptors`), so importing it never pulls in the backend or effect constructors.
+For on-demand loading, use dynamic `import()`:
+
+```typescript
+const { createBackendRegistry, ComposedPipeline } = await import('anime4k-webgpu-async/engines');
+const { createAnime4kBackend, anime4kPresetPlans } =
+  await import('anime4k-webgpu-async/engines/anime4k');
+```
+
+`loadAnime4kConstructor(key)` is exported from `anime4k-webgpu-async/engines/anime4k` (and via
+`./engines`) for optional prewarming of a single effect chunk. Otherwise
+`createAnime4kBackend`'s `compileEffect` loads each effect's constructor lazily, so every effect
+becomes its own chunk.
+
+> **Serve the chunks.** Dynamic-import chunks mean a one-time fetch the first time each effect
+> is compiled. Deployments should serve the whole `dist/**` directory, including the per-effect
+> chunk files.
+
+Node's `require(esm)` (Node ≥20.19) can load the package, but no CJS build is provided; prefer
+`import`. `@webgpu/types` remains the only peer dependency, and a modern WebGPU browser is
+required.
+
+### Tree-shaking
+
+The ESM graph is built per-module with `"sideEffects": false`, so an `exports`-aware bundler can
+drop everything you don't import. To get the most out of it:
+
+- **Use named imports.** `import { CNNx2VL } from 'anime4k-webgpu-async'` keeps only that effect
+  reachable; `import * as anime4k` pulls in the whole namespace.
+- **Import `render` and pipelines directly** from the root instead of re-export barrels.
+- **Use `anime4k-webgpu-async/engines` for composers** such as `ComposedPipeline` and
+  `createBackendRegistry`, so renderer-only usage doesn't drag in the engine graph.
+- **Let `createAnime4kBackend` split chunks.** Its per-effect dynamic imports produce one chunk
+  per effect; prewarm a hot effect with `loadAnime4kConstructor(key)`.
+
+Approximate Rollup output (minified, tree-shaken):
+
+| Entry | Size |
+| --- | --- |
+| `render` | ~9.5 KB |
+| `CNNx2VL` | ~193 KB |
+| `ModeA` | ~430 KB |
+| `ComposedPipeline` | ~16 KB |
+| Anime4K backend | ~30 KB initial + 15 lazy chunks |
+
+Eagerly importing the whole library used to be ~3.35 MB; the numbers above are what a bundler
+keeps once unused effects are removed.
 
 ## Usage
 
@@ -51,7 +127,9 @@ await render({
 });
 ```
 
-See [`examples/react-renderer.tsx`](./examples/react-renderer.tsx) for a React example.
+See [`examples/react-renderer.tsx`](./examples/react-renderer.tsx) for a React example that
+builds a preset through the engine composer (`ComposedPipeline.fromPreset`), and
+[`examples/react-webgpu.tsx`](./examples/react-webgpu.tsx) for a manual, raw-WebGPU integration.
 
 For a [preset mode](https://github.com/bloc97/Anime4K/blob/master/md/GLSL_Instructions_Advanced.md),
 pass the native and target resolutions so the correct chain is assembled automatically:
@@ -93,6 +171,62 @@ render-based helpers (e.g. `Overlay`, `Downscale`) expose
 `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING`, while compute-based helpers (e.g.
 `Conv2d`, `ClampHighlights`) only need `TEXTURE_BINDING | STORAGE_BINDING`. Pipelines can be
 chained in tandem for more sophisticated effects.
+
+### 3. Engine-backed composition
+
+Effects can also be composed through an engine backend instead of importing pipeline classes
+directly. Register the Anime4K backend, then build a preset chain with
+`ComposedPipeline.fromPreset`, or a flat chain from an `EffectReference[]` with
+`ComposedPipeline.fromEffects`. Both are async, and `render()` now accepts a builder that returns
+a Promise, so the composed pipeline can be passed straight through:
+
+```typescript
+import {
+  ANIME4K_PRESET_MODES,
+  ComposedPipeline,
+  createAnime4kBackend,
+  createBackendRegistry,
+  render,
+} from 'anime4k-webgpu-async';
+
+const registry = createBackendRegistry();
+registry.register(createAnime4kBackend());
+
+await render({
+  video,
+  canvas,
+  pipelineBuilder: (device, inputTexture) => ComposedPipeline.fromPreset({
+    device,
+    inputTexture,
+    nativeDimensions: { width: video.videoWidth, height: video.videoHeight },
+    targetDimensions: { width: canvas.width, height: canvas.height },
+    registry,
+    backendId: 'anime4k',
+    // ANIME4K_PRESET_MODES: 'A' | 'AA' | 'B' | 'BB' | 'C' | 'CA'
+    modeId: 'A',
+    tier: 'balanced', // accepted, but currently a no-op for Anime4K
+  }),
+});
+```
+
+A flat chain takes the same context with `effects` instead of `modeId`/`tier`:
+
+```typescript
+await ComposedPipeline.fromEffects({
+  device,
+  inputTexture,
+  nativeDimensions,
+  targetDimensions,
+  registry,
+  effects: [/* EffectReference[] */],
+});
+```
+
+Backends expose `resolvePreset` and `resolvePresetPlan` to turn a preset into executable
+`PresetNode`s. A `PresetNode` is either an effect node — optionally carrying
+`when: 'upscale-x2-if-needed'` — or `{ kind: 'auto-downscale' }`. `tier` is accepted by
+`fromPreset` but currently has no effect for Anime4K: there is one pipeline per effect and no
+tier-parameterized weights.
 
 ### Supported pipelines
 

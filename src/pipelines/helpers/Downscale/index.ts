@@ -1,4 +1,8 @@
-import { Anime4KPipeline, Anime4KPipelineDescriptor, DownscalePipelineDescriptor } from '../../interfaces';
+import {
+  Anime4KPipeline,
+  Anime4KPipelineDescriptor,
+  DownscalePipelineDescriptor,
+} from '../../interfaces';
 import vertexWGSL from './shaders/vertex.wgsl';
 import fragmentWGSL from './shaders/fragment.wgsl';
 
@@ -24,9 +28,10 @@ export class Downscale implements Anime4KPipeline {
       label: `${name} output texture`,
       size: [targetDimensions.width, targetDimensions.height, 1],
       format: 'rgba16float',
-      usage: GPUTextureUsage.TEXTURE_BINDING
-      | GPUTextureUsage.RENDER_ATTACHMENT
-      | GPUTextureUsage.STORAGE_BINDING,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
     });
 
     // modules
@@ -111,7 +116,10 @@ export class Downscale implements Anime4KPipeline {
         {
           view: this.outputTexture.createView(),
           clearValue: {
-            r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
           },
           loadOp: 'clear' as GPULoadOp,
           storeOp: 'store' as GPUStoreOp,

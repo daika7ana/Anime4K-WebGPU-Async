@@ -7,15 +7,15 @@ export class ClampHighlights implements Anime4KPipeline {
   name: string;
 
   pipelines: {
-    luminationXPipeline: Promise<GPUComputePipeline>,
-    luminationYPipeline: Promise<GPUComputePipeline>,
-    clampPipeline: Promise<GPUComputePipeline>,
+    luminationXPipeline: Promise<GPUComputePipeline>;
+    luminationYPipeline: Promise<GPUComputePipeline>;
+    clampPipeline: Promise<GPUComputePipeline>;
   };
 
   bindGroups: {
-    luminationXBindGroup: GPUBindGroup,
-    luminationYBindGroup: GPUBindGroup,
-    clampBindGroup: GPUBindGroup,
+    luminationXBindGroup: GPUBindGroup;
+    luminationYBindGroup: GPUBindGroup;
+    clampBindGroup: GPUBindGroup;
   };
 
   outputTexture: GPUTexture;

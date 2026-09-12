@@ -29,10 +29,7 @@ export class BilateralMean implements Anime4KPipeline {
 
   readonly isCompute = true;
 
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     this.device = device;
     this.inputTexWidth = inputTexture.width;
     this.inputTexHeight = inputTexture.height;
@@ -45,29 +42,31 @@ export class BilateralMean implements Anime4KPipeline {
 
     const denoiseMeanBindGroupLayout = device.createBindGroupLayout({
       label: 'Denoise Bilateral Mean Bind Group Layout',
-      entries: [{
-        binding: 0, // input frame texture
-        visibility: GPUShaderStage.COMPUTE,
-        texture: {},
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
+      entries: [
+        {
+          binding: 0, // input frame texture
+          visibility: GPUShaderStage.COMPUTE,
+          texture: {},
         },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' },
-      }],
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba16float',
+          },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+      ],
     });
 
     const denoiseMeanTexture = this.device.createTexture({
@@ -137,10 +136,7 @@ export class BilateralMean implements Anime4KPipeline {
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
     pass.setPipeline(await this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
+    pass.dispatchWorkgroups(Math.ceil(this.inputTexWidth / 8), Math.ceil(this.inputTexHeight / 8));
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
@@ -153,7 +149,6 @@ export class BilateralMean implements Anime4KPipeline {
     return this.texture;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   updateParam(param: string, value): void {
     if (param !== 'strength' && param !== 'strength2') {
       throw new Error(`No param name as ${param}`);

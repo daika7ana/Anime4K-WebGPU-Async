@@ -29,10 +29,7 @@ export class DoG implements Anime4KPipeline {
 
   readonly isCompute = true;
 
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     this.device = device;
     this.inputTexWidth = inputTexture.width;
     this.inputTexHeight = inputTexture.height;
@@ -245,12 +242,7 @@ export class DoG implements Anime4KPipeline {
       deblurDoGApplyTexture,
     ];
 
-    this.modules = [
-      luminationModule,
-      deblurDoGXModule,
-      deblurDoGYModule,
-      deblurDoGApplyModule,
-    ];
+    this.modules = [luminationModule, deblurDoGXModule, deblurDoGYModule, deblurDoGApplyModule];
 
     this.bindGroupLayouts = [
       luminationBindGroupLayout,
@@ -361,7 +353,7 @@ export class DoG implements Anime4KPipeline {
     ];
   }
 
-  getOutputTexture() : GPUTexture {
+  getOutputTexture(): GPUTexture {
     return this.textures[3];
   }
 
@@ -382,34 +374,22 @@ export class DoG implements Anime4KPipeline {
     // lumination
     pass.setPipeline(await this.pipelines[0]);
     pass.setBindGroup(0, this.bindGroups[0]);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
+    pass.dispatchWorkgroups(Math.ceil(this.inputTexWidth / 8), Math.ceil(this.inputTexHeight / 8));
 
     // deblurDoGX
     pass.setPipeline(await this.pipelines[1]);
     pass.setBindGroup(0, this.bindGroups[1]);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
+    pass.dispatchWorkgroups(Math.ceil(this.inputTexWidth / 8), Math.ceil(this.inputTexHeight / 8));
 
     // deblurDoGY
     pass.setPipeline(await this.pipelines[2]);
     pass.setBindGroup(0, this.bindGroups[2]);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
+    pass.dispatchWorkgroups(Math.ceil(this.inputTexWidth / 8), Math.ceil(this.inputTexHeight / 8));
 
     // deblurDoGApply
     pass.setPipeline(await this.pipelines[3]);
     pass.setBindGroup(0, this.bindGroups[3]);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.inputTexWidth / 8),
-      Math.ceil(this.inputTexHeight / 8),
-    );
+    pass.dispatchWorkgroups(Math.ceil(this.inputTexWidth / 8), Math.ceil(this.inputTexHeight / 8));
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {

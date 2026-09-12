@@ -1,26 +1,53 @@
 {
   "name": "anime4k-webgpu-async",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "Anime4K WebGPU port",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "build": "webpack && tsc --emitDeclarationOnly",
+    "build": "vite build",
     "dev": "nodemon",
-    "lint": "eslint . --ext .js,.ts"
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:preset-parity": "node scripts/check-preset-parity.cjs",
+    "check:packaging": "node scripts/check-packaging.cjs",
+    "verify": "pnpm build && pnpm check:preset-parity && pnpm check:packaging && pnpm lint && pnpm format:check"
   },
   "nodemonConfig": {
     "watch": [
       "src"
     ],
     "ext": "ts,js,wgsl",
-    "exec": "npm run build"
+    "exec": "pnpm run build"
   },
   "files": [
-    "lib/",
+    "dist/",
     "LICENSE.md",
     "README.md"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./engines": {
+      "types": "./dist/engines/index.d.ts",
+      "default": "./dist/engines/index.js"
+    },
+    "./engines/anime4k": {
+      "types": "./dist/engines/anime4k/index.d.ts",
+      "default": "./dist/engines/anime4k/index.js"
+    },
+    "./engines/anime4k/catalog": {
+      "types": "./dist/engines/anime4k/catalog.d.ts",
+      "default": "./dist/engines/anime4k/catalog.js"
+    },
+    "./package.json": "./package.json"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/daika7ana/Anime4K-WebGPU-Async.git"
@@ -39,32 +66,22 @@
   },
   "homepage": "https://github.com/daika7ana/Anime4K-WebGPU-Async#readme",
   "peerDependencies": {
-    "@webgpu/types": "^0.1.38"
-  },
-  "overrides": {
-    "@typescript-eslint/typescript-estree": {
-      "minimatch": "^9.0.9"
-    }
+    "@webgpu/types": "^0.1.72"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@typescript-eslint/eslint-plugin": "^6.13.2",
-    "@typescript-eslint/parser": "^6.13.2",
-    "@webgpu/types": "^0.1.38",
-    "clean-webpack-plugin": "^4.0.0",
-    "eslint": "^8.55.0",
-    "eslint-config-airbnb": "^19.0.4",
-    "eslint-config-airbnb-typescript": "^17.1.0",
-    "eslint-import-resolver-typescript": "^3.6.1",
-    "eslint-plugin-import": "^2.29.0",
-    "eslint-plugin-jsx-a11y": "^6.8.0",
-    "eslint-plugin-react": "^7.33.2",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "nodemon": "^3.0.2",
-    "raw-loader": "^4.0.2",
-    "ts-loader": "^9.5.1",
-    "typescript": "~5.3.3",
-    "webpack": "^5.89.0",
-    "webpack-cli": "^5.1.4"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.6",
+    "@webgpu/types": "^0.1.72",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "globals": "^17.12.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "unplugin-dts": "^1.1.0",
+    "vite": "^8.3.0"
   }
 }

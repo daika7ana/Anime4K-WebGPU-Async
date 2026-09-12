@@ -53,56 +53,72 @@ export class GANUUL implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtfWGSL, conv2dtf1WGSL,
-      conv2d1tfWGSL, conv2d1tf1WGSL, conv2d1tf2WGSL,
-      conv2d2tfWGSL, conv2d2tf1WGSL,
-      conv2d3tfWGSL, conv2d3tf1WGSL, conv2d3tf2WGSL,
-      conv2d4tfWGSL, conv2d4tf1WGSL,
-      conv2d5tfWGSL, conv2d5tf1WGSL, conv2d5tf2WGSL,
-      conv2d6tfWGSL, conv2d6tf1WGSL,
-      output];
+      conv2dtfWGSL,
+      conv2dtf1WGSL,
+      conv2d1tfWGSL,
+      conv2d1tf1WGSL,
+      conv2d1tf2WGSL,
+      conv2d2tfWGSL,
+      conv2d2tf1WGSL,
+      conv2d3tfWGSL,
+      conv2d3tf1WGSL,
+      conv2d3tf2WGSL,
+      conv2d4tfWGSL,
+      conv2d4tf1WGSL,
+      conv2d5tfWGSL,
+      conv2d5tf1WGSL,
+      conv2d5tf2WGSL,
+      conv2d6tfWGSL,
+      conv2d6tf1WGSL,
+      output,
+    ];
 
     // inputTexture -> 0, 1
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: [inputTexture],
-      shaderWGSL: shaders[0],
-      name: 'conv2d_tf',
-    }));
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: [inputTexture],
-      shaderWGSL: shaders[1],
-      name: 'conv2d_tf1',
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: [inputTexture],
+        shaderWGSL: shaders[0],
+        name: 'conv2d_tf',
+      }),
+    );
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: [inputTexture],
+        shaderWGSL: shaders[1],
+        name: 'conv2d_tf1',
+      }),
+    );
 
     // 0, 1 -> 2, 3, 4
     const outputTextures: GPUTexture[] = [];
     this.fillOutputTextures(outputTextures, 0, 2);
     for (let i = 0; i < 3; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 2],
-        name: `conv2d_1_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 2],
+          name: `conv2d_1_tf_${i}`,
+        }),
+      );
     }
 
     // 2, 3, 4 -> 5, 6
     outputTextures.length = 0;
     this.fillOutputTextures(outputTextures, 2, 3);
     for (let i = 0; i < 2; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 5],
-        name: `conv2d_2_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 5],
+          name: `conv2d_2_tf_${i}`,
+        }),
+      );
     }
 
     // 0, 1, 5, 6 -> 7, 8, 9
@@ -110,24 +126,28 @@ export class GANUUL implements Anime4KPipeline {
     this.fillOutputTextures(outputTextures, 0, 2);
     this.fillOutputTextures(outputTextures, 5, 2);
     for (let i = 0; i < 3; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 7],
-        name: `conv2d_3_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 7],
+          name: `conv2d_3_tf_${i}`,
+        }),
+      );
     }
 
     // 7, 8, 9 -> 10, 11
     outputTextures.length = 0;
     this.fillOutputTextures(outputTextures, 7, 3);
     for (let i = 0; i < 2; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 10],
-        name: `conv2d_4_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 10],
+          name: `conv2d_4_tf_${i}`,
+        }),
+      );
     }
 
     // 5, 6, 10, 11 -> 12, 13, 14
@@ -135,41 +155,49 @@ export class GANUUL implements Anime4KPipeline {
     this.fillOutputTextures(outputTextures, 5, 2);
     this.fillOutputTextures(outputTextures, 10, 2);
     for (let i = 0; i < 3; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 12],
-        name: `conv2d_5_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 12],
+          name: `conv2d_5_tf_${i}`,
+        }),
+      );
     }
 
     // 12, 13, 14 -> 15, 16
     outputTextures.length = 0;
     this.fillOutputTextures(outputTextures, 12, 3);
     for (let i = 0; i < 2; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[i + 15],
-        name: `conv2d_6_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[i + 15],
+          name: `conv2d_6_tf_${i}`,
+        }),
+      );
     }
 
     // 10, 11, 15, 16 -> output
     outputTextures.length = 0;
     this.fillOutputTextures(outputTextures, 10, 2);
     this.fillOutputTextures(outputTextures, 15, 2);
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: output,
-      name: 'output',
-    }));
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
-      outputTextureSize: [inputTexture.width, inputTexture.height],
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: output,
+        name: 'output',
+      }),
+    );
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
+        outputTextureSize: [inputTexture.width, inputTexture.height],
+      }),
+    );
   }
 
   fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {

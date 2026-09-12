@@ -25,48 +25,58 @@ export class CNNM implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtfWGSL, conv2d1tfWGSL, conv2d2tfWGSL,
-      conv2d3tfWGSL, conv2d4tfWGSL, conv2d5tfWGSL,
-      conv2d6tfWGSL];
+      conv2dtfWGSL,
+      conv2d1tfWGSL,
+      conv2d2tfWGSL,
+      conv2d3tfWGSL,
+      conv2d4tfWGSL,
+      conv2d5tfWGSL,
+      conv2d6tfWGSL,
+    ];
 
     // pipeline 0: main -> conv_2d_tf
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: [inputTexture],
-      shaderWGSL: shaders[0],
-      name: 'conv2d_tf',
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: [inputTexture],
+        shaderWGSL: shaders[0],
+        name: 'conv2d_tf',
+      }),
+    );
 
     // pipeline 1 - 6:
     for (let i = 1; i < shaders.length; i += 1) {
       // get the output texture from last pipeline
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: [this.pipelines[i - 1].getOutputTexture()],
-        shaderWGSL: shaders[i],
-        name: `conv2d_${i}_tf`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: [this.pipelines[i - 1].getOutputTexture()],
+          shaderWGSL: shaders[i],
+          name: `conv2d_${i}_tf`,
+        }),
+      );
     }
 
     const outputTextures: GPUTexture[] = [];
     this.fillOutputTextures(outputTextures, 0, 7);
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: output,
-      name: 'output',
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: output,
+        name: 'output',
+      }),
+    );
 
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
-      outputTextureSize: [inputTexture.width, inputTexture.height],
-    }));
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
+        outputTextureSize: [inputTexture.width, inputTexture.height],
+      }),
+    );
   }
 
   private fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {

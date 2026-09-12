@@ -56,17 +56,21 @@ export class Overlay implements Anime4KPipeline {
       label: `${name}: output texture`,
       size: [outputTextureSize[0], outputTextureSize[1], 1],
       format: 'rgba16float',
-      usage: GPUTextureUsage.TEXTURE_BINDING
-      | GPUTextureUsage.RENDER_ATTACHMENT
-      | GPUTextureUsage.STORAGE_BINDING,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
     });
 
     // Detect same-resolution: use compute pipeline instead of render pipeline.
     // The compute shader/bind group only supports exactly 2 input textures, so
     // fall back to the render path otherwise.
-    const isSameResolution = inputTextures.length === 2
-      && inputTextures.every((texture) => texture.width === outputTextureSize[0]
-        && texture.height === outputTextureSize[1]);
+    const isSameResolution =
+      inputTextures.length === 2 &&
+      inputTextures.every(
+        (texture) =>
+          texture.width === outputTextureSize[0] && texture.height === outputTextureSize[1],
+      );
 
     if (isSameResolution) {
       this.isCompute = true;
@@ -201,7 +205,7 @@ export class Overlay implements Anime4KPipeline {
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
     pass.setPipeline(await this.computePipeline!);
-    pass.setBindGroup(0, this.computeBindGroup!);
+    pass.setBindGroup(0, this.computeBindGroup);
     pass.dispatchWorkgroups(
       Math.ceil(this.outputTexture.width / 8),
       Math.ceil(this.outputTexture.height / 8),
@@ -219,7 +223,10 @@ export class Overlay implements Anime4KPipeline {
           {
             view: this.outputTexture.createView(),
             clearValue: {
-              r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+              r: 0.0,
+              g: 0.0,
+              b: 0.0,
+              a: 1.0,
             },
             loadOp: 'clear',
             storeOp: 'store',

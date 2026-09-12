@@ -25,11 +25,7 @@ export class DepthToSpace implements Anime4KPipeline {
    *
    * @throws {Error} Will throw an error if the number of input textures is not 3.
    */
-  constructor({
-    device,
-    inputTextures,
-    name = 'depth to space',
-  }: DepthToSpacePipelineDescriptor) {
+  constructor({ device, inputTextures, name = 'depth to space' }: DepthToSpacePipelineDescriptor) {
     // sanity check
     if (inputTextures.length !== 3) {
       throw Error(`expect 3 textures for depth2Space, got ${inputTextures.length}`);

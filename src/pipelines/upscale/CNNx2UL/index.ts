@@ -48,27 +48,43 @@ export class CNNx2UL implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtf, conv2dtf1, conv2dtf2,
-      conv2d1tf, conv2d1tf1, conv2d1tf2,
-      conv2d2tf, conv2d2tf1, conv2d2tf2,
-      conv2d3tf, conv2d3tf1, conv2d3tf2,
-      conv2d4tf, conv2d4tf1, conv2d4tf2,
-      conv2d5tf, conv2d5tf1, conv2d5tf2,
-      conv2d6tf, conv2d6tf1, conv2d6tf2,
-      conv2dlasttf, conv2dlasttf1, conv2dlasttf2];
+      conv2dtf,
+      conv2dtf1,
+      conv2dtf2,
+      conv2d1tf,
+      conv2d1tf1,
+      conv2d1tf2,
+      conv2d2tf,
+      conv2d2tf1,
+      conv2d2tf2,
+      conv2d3tf,
+      conv2d3tf1,
+      conv2d3tf2,
+      conv2d4tf,
+      conv2d4tf1,
+      conv2d4tf2,
+      conv2d5tf,
+      conv2d5tf1,
+      conv2d5tf2,
+      conv2d6tf,
+      conv2d6tf1,
+      conv2d6tf2,
+      conv2dlasttf,
+      conv2dlasttf1,
+      conv2dlasttf2,
+    ];
 
     for (let i = 0; i < 3; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: [inputTexture],
-        shaderWGSL: shaders[i],
-        name: `conv2d_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: [inputTexture],
+          shaderWGSL: shaders[i],
+          name: `conv2d_tf_${i}`,
+        }),
+      );
     }
 
     const outputTextures: GPUTexture[] = [];
@@ -79,12 +95,14 @@ export class CNNx2UL implements Anime4KPipeline {
       outputTextures.push(this.pipelines[3 * (i - 1) + 2].getOutputTexture());
 
       for (let j = 0; j < 3; j += 1) {
-        this.pipelines.push(new Conv2d({
-          device,
-          inputTextures: outputTextures,
-          shaderWGSL: shaders[3 * i + j],
-          name: `conv2d_${i}_tf_${j}`,
-        }));
+        this.pipelines.push(
+          new Conv2d({
+            device,
+            inputTextures: outputTextures,
+            shaderWGSL: shaders[3 * i + j],
+            name: `conv2d_${i}_tf_${j}`,
+          }),
+        );
       }
     }
 
@@ -94,35 +112,40 @@ export class CNNx2UL implements Anime4KPipeline {
     }
 
     for (let i = 0; i <= 2; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shaders[21 + i],
-        name: `conv2d_last_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shaders[21 + i],
+          name: `conv2d_last_tf_${i}`,
+        }),
+      );
     }
-    this.pipelines.push(new DepthToSpace({
-      device,
-      inputTextures: [
-        this.pipelines[21].getOutputTexture(),
-        this.pipelines[22].getOutputTexture(),
-        this.pipelines[23].getOutputTexture(),
-      ],
-      name: 'DepthToSpace',
-    }));
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.pipelines[24].getOutputTexture()],
-      outputTextureSize: [2 * inputTexture.width, 2 * inputTexture.height],
-    }));
+    this.pipelines.push(
+      new DepthToSpace({
+        device,
+        inputTextures: [
+          this.pipelines[21].getOutputTexture(),
+          this.pipelines[22].getOutputTexture(),
+          this.pipelines[23].getOutputTexture(),
+        ],
+        name: 'DepthToSpace',
+      }),
+    );
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.pipelines[24].getOutputTexture()],
+        outputTextureSize: [2 * inputTexture.width, 2 * inputTexture.height],
+      }),
+    );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   updateParam(param: string, value: any): void {
     throw new Error(`${this.constructor.name} has no param`);
   }
 
-  getOutputTexture() : GPUTexture {
+  getOutputTexture(): GPUTexture {
     return this.pipelines[this.pipelines.length - 1].getOutputTexture();
   }
 

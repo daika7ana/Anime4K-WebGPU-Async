@@ -136,58 +136,109 @@ export class GANx4UUL implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders6: string[] = [
-      conv2dtfWGSL, conv2dtf1WGSL, conv2dtf2WGSL,
-      conv2dtf3WGSL, conv2dtf4WGSL, conv2dtf5WGSL,
-      conv2d3tfWGSL, conv2d3tf1WGSL, conv2d3tf2WGSL,
-      conv2d3tf3WGSL, conv2d3tf4WGSL, conv2d3tf5WGSL,
-      conv2d6tfWGSL, conv2d6tf1WGSL, conv2d6tf2WGSL,
-      conv2d6tf3WGSL, conv2d6tf4WGSL, conv2d6tf5WGSL,
-      conv2d9tfWGSL, conv2d9tf1WGSL, conv2d9tf2WGSL,
-      conv2d9tf3WGSL, conv2d9tf4WGSL, conv2d9tf5WGSL,
-      conv2d12tfWGSL, conv2d12tf1WGSL, conv2d12tf2WGSL,
-      conv2d12tf3WGSL, conv2d12tf4WGSL, conv2d12tf5WGSL,
-      conv2d15tfWGSL, conv2d15tf1WGSL, conv2d15tf2WGSL,
-      conv2d15tf3WGSL, conv2d15tf4WGSL, conv2d15tf5WGSL,
-      conv2d18tfWGSL, conv2d18tf1WGSL, conv2d18tf2WGSL,
-      conv2d18tf3WGSL, conv2d18tf4WGSL, conv2d18tf5WGSL,
-      conv2d21tfWGSL, conv2d21tf1WGSL, conv2d21tf2WGSL,
-      conv2d21tf3WGSL, conv2d21tf4WGSL, conv2d21tf5WGSL,
-      conv2d24tfWGSL, conv2d24tf1WGSL, conv2d24tf2WGSL,
-      conv2d24tf3WGSL, conv2d24tf4WGSL, conv2d24tf5WGSL,
+      conv2dtfWGSL,
+      conv2dtf1WGSL,
+      conv2dtf2WGSL,
+      conv2dtf3WGSL,
+      conv2dtf4WGSL,
+      conv2dtf5WGSL,
+      conv2d3tfWGSL,
+      conv2d3tf1WGSL,
+      conv2d3tf2WGSL,
+      conv2d3tf3WGSL,
+      conv2d3tf4WGSL,
+      conv2d3tf5WGSL,
+      conv2d6tfWGSL,
+      conv2d6tf1WGSL,
+      conv2d6tf2WGSL,
+      conv2d6tf3WGSL,
+      conv2d6tf4WGSL,
+      conv2d6tf5WGSL,
+      conv2d9tfWGSL,
+      conv2d9tf1WGSL,
+      conv2d9tf2WGSL,
+      conv2d9tf3WGSL,
+      conv2d9tf4WGSL,
+      conv2d9tf5WGSL,
+      conv2d12tfWGSL,
+      conv2d12tf1WGSL,
+      conv2d12tf2WGSL,
+      conv2d12tf3WGSL,
+      conv2d12tf4WGSL,
+      conv2d12tf5WGSL,
+      conv2d15tfWGSL,
+      conv2d15tf1WGSL,
+      conv2d15tf2WGSL,
+      conv2d15tf3WGSL,
+      conv2d15tf4WGSL,
+      conv2d15tf5WGSL,
+      conv2d18tfWGSL,
+      conv2d18tf1WGSL,
+      conv2d18tf2WGSL,
+      conv2d18tf3WGSL,
+      conv2d18tf4WGSL,
+      conv2d18tf5WGSL,
+      conv2d21tfWGSL,
+      conv2d21tf1WGSL,
+      conv2d21tf2WGSL,
+      conv2d21tf3WGSL,
+      conv2d21tf4WGSL,
+      conv2d21tf5WGSL,
+      conv2d24tfWGSL,
+      conv2d24tf1WGSL,
+      conv2d24tf2WGSL,
+      conv2d24tf3WGSL,
+      conv2d24tf4WGSL,
+      conv2d24tf5WGSL,
     ];
 
     const shaders: string[] = [
-      conv2d1tfWGSL, conv2d2tfWGSL,
-      conv2d4tfWGSL, conv2d5tfWGSL,
-      conv2d7tfWGSL, conv2d8tfWGSL,
-      conv2d10tfWGSL, conv2d11tfWGSL,
-      conv2d13tfWGSL, conv2d14tfWGSL,
-      conv2d16tfWGSL, conv2d17tfWGSL,
-      conv2d19tfWGSL, conv2d20tfWGSL,
-      conv2d22tfWGSL, conv2d23tfWGSL,
+      conv2d1tfWGSL,
+      conv2d2tfWGSL,
+      conv2d4tfWGSL,
+      conv2d5tfWGSL,
+      conv2d7tfWGSL,
+      conv2d8tfWGSL,
+      conv2d10tfWGSL,
+      conv2d11tfWGSL,
+      conv2d13tfWGSL,
+      conv2d14tfWGSL,
+      conv2d16tfWGSL,
+      conv2d17tfWGSL,
+      conv2d19tfWGSL,
+      conv2d20tfWGSL,
+      conv2d22tfWGSL,
+      conv2d23tfWGSL,
       conv2d25tfWGSL,
     ];
 
     const shadersUps: string[] = [
-      conv0upsWGSL, conv0ups1WGSL, conv0ups2WGSL,
-      conv0ups3WGSL, conv0ups4WGSL, conv0ups5WGSL,
-      overlayConv1upsWGSL, overlayConv1ups1WGSL, overlayConv1ups2WGSL,
-      overlayConv1ups3WGSL, overlayConv1ups4WGSL, overlayConv1ups5WGSL,
+      conv0upsWGSL,
+      conv0ups1WGSL,
+      conv0ups2WGSL,
+      conv0ups3WGSL,
+      conv0ups4WGSL,
+      conv0ups5WGSL,
+      overlayConv1upsWGSL,
+      overlayConv1ups1WGSL,
+      overlayConv1ups2WGSL,
+      overlayConv1ups3WGSL,
+      overlayConv1ups4WGSL,
+      overlayConv1ups5WGSL,
     ];
 
     let len = this.pipelines6.length;
     for (let i = 0; i < 6; i += 1) {
-      this.pipelines6.push(new Conv2d({
-        device,
-        inputTextures: [inputTexture],
-        shaderWGSL: shaders6[i],
-        name: `conv2d_tf_${i}`,
-      }));
+      this.pipelines6.push(
+        new Conv2d({
+          device,
+          inputTextures: [inputTexture],
+          shaderWGSL: shaders6[i],
+          name: `conv2d_tf_${i}`,
+        }),
+      );
     }
 
     const outputTextures: GPUTexture[] = [];
@@ -195,34 +246,40 @@ export class GANx4UUL implements Anime4KPipeline {
       outputTextures.length = 0;
       this.fillOutputTexturesFromPipeline6(outputTextures, len, 6);
       for (let j = 0; j < 2; j += 1) {
-        this.pipelines.push(new Conv2d({
-          device,
-          inputTextures: outputTextures,
-          shaderWGSL: shaders[j + 2 * i],
-          name: `conv2d_${j + 3 * i + 1}_tf`,
-        }));
+        this.pipelines.push(
+          new Conv2d({
+            device,
+            inputTextures: outputTextures,
+            shaderWGSL: shaders[j + 2 * i],
+            name: `conv2d_${j + 3 * i + 1}_tf`,
+          }),
+        );
       }
 
       this.addOutputTexturesFromPipeline(outputTextures);
       len = this.pipelines6.length;
       for (let j = 0; j < 6; j += 1) {
-        this.pipelines6.push(new Conv2d({
-          device,
-          inputTextures: outputTextures,
-          shaderWGSL: shaders6[len + j],
-          name: `conv2d_${3 * (i + 1)}_tf${j}`,
-        }));
+        this.pipelines6.push(
+          new Conv2d({
+            device,
+            inputTextures: outputTextures,
+            shaderWGSL: shaders6[len + j],
+            name: `conv2d_${3 * (i + 1)}_tf${j}`,
+          }),
+        );
       }
     }
 
     outputTextures.length = 0;
     this.fillOutputTexturesFromPipeline6(outputTextures, 48, 6);
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: shaders[shaders.length - 1],
-      name: 'conv2d_25_tf',
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: shaders[shaders.length - 1],
+        name: 'conv2d_25_tf',
+      }),
+    );
 
     outputTextures.push(this.pipelines[15].getOutputTexture());
     for (let i = 0; i < 15; i += 1) {
@@ -233,12 +290,14 @@ export class GANx4UUL implements Anime4KPipeline {
     outputTextures.push(this.pipelines[this.pipelines.length - 1].getOutputTexture());
 
     for (let i = 0; i < 6; i += 1) {
-      this.pipelinesUps.push(new Conv2d({
-        device,
-        inputTextures: outputTextures,
-        shaderWGSL: shadersUps[i],
-        name: `conv0ups${i}`,
-      }));
+      this.pipelinesUps.push(
+        new Conv2d({
+          device,
+          inputTextures: outputTextures,
+          shaderWGSL: shadersUps[i],
+          name: `conv0ups${i}`,
+        }),
+      );
     }
 
     outputTextures.length = 0;
@@ -247,33 +306,39 @@ export class GANx4UUL implements Anime4KPipeline {
     }
 
     for (let i = 0; i < 6; i += 1) {
-      this.pipelinesUps.push(new Overlay({
-        device,
-        inputTextures: outputTextures,
-        outputTextureSize: [4 * inputTexture.width, 4 * inputTexture.height],
-        fragmentWGSL: shadersUps[i + 6],
-        name: `overlay_conv1ups${i}`,
-      }));
+      this.pipelinesUps.push(
+        new Overlay({
+          device,
+          inputTextures: outputTextures,
+          outputTextureSize: [4 * inputTexture.width, 4 * inputTexture.height],
+          fragmentWGSL: shadersUps[i + 6],
+          name: `overlay_conv1ups${i}`,
+        }),
+      );
     }
 
     outputTextures.length = 0;
     for (let i = 6; i < this.pipelinesUps.length; i += 1) {
       outputTextures.push(this.pipelinesUps[i].getOutputTexture());
     }
-    this.pipelinesUps.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: output,
-      name: 'output',
-    }));
-    this.pipelinesUps.push(new Overlay({
-      device,
-      inputTextures: [
-        this.pipelinesUps[this.pipelinesUps.length - 1].getOutputTexture(),
-        inputTexture,
-      ],
-      outputTextureSize: [4 * inputTexture.width, 4 * inputTexture.height],
-    }));
+    this.pipelinesUps.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: output,
+        name: 'output',
+      }),
+    );
+    this.pipelinesUps.push(
+      new Overlay({
+        device,
+        inputTextures: [
+          this.pipelinesUps[this.pipelinesUps.length - 1].getOutputTexture(),
+          inputTexture,
+        ],
+        outputTextureSize: [4 * inputTexture.width, 4 * inputTexture.height],
+      }),
+    );
   }
 
   private fillOutputTexturesFromPipeline6(

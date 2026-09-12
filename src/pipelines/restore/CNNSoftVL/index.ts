@@ -42,19 +42,24 @@ export class CNNSoftVL implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtfWGSL, conv2dtf1WGSL,
-      conv2d1tfWGSL, conv2d1tf1WGSL,
-      conv2d2tfWGSL, conv2d2tf1WGSL,
-      conv2d3tfWGSL, conv2d3tf1WGSL,
-      conv2d4tfWGSL, conv2d4tf1WGSL,
-      conv2d5tfWGSL, conv2d5tf1WGSL,
-      conv2d6tfWGSL, conv2d6tf1WGSL,
-      conv2d7tfWGSL, conv2d7tf1WGSL,
+      conv2dtfWGSL,
+      conv2dtf1WGSL,
+      conv2d1tfWGSL,
+      conv2d1tf1WGSL,
+      conv2d2tfWGSL,
+      conv2d2tf1WGSL,
+      conv2d3tfWGSL,
+      conv2d3tf1WGSL,
+      conv2d4tfWGSL,
+      conv2d4tf1WGSL,
+      conv2d5tfWGSL,
+      conv2d5tf1WGSL,
+      conv2d6tfWGSL,
+      conv2d6tf1WGSL,
+      conv2d7tfWGSL,
+      conv2d7tf1WGSL,
     ];
 
     this.pushPipeline(device, [inputTexture], shaders[0], 'conv2d_tf');
@@ -70,18 +75,22 @@ export class CNNSoftVL implements Anime4KPipeline {
 
     const outputTextures: GPUTexture[] = [];
     this.fillOutputTextures(outputTextures, 2, 14);
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: output,
-      name: 'output',
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: output,
+        name: 'output',
+      }),
+    );
 
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
-      outputTextureSize: [inputTexture.width, inputTexture.height],
-    }));
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
+        outputTextureSize: [inputTexture.width, inputTexture.height],
+      }),
+    );
   }
 
   updateParam(param: string, value: any): void {
@@ -106,12 +115,14 @@ export class CNNSoftVL implements Anime4KPipeline {
     shaderWGSL: string,
     name: string,
   ): void {
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: inputTexture,
-      shaderWGSL,
-      name,
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: inputTexture,
+        shaderWGSL,
+        name,
+      }),
+    );
   }
 
   private fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {

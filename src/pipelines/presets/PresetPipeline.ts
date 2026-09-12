@@ -57,12 +57,14 @@ export class PresetPipeline extends PipelineChain {
 
   /** Append the native/target aware auto-downscale wrapper. */
   protected addAutoDownscale(): this {
-    this.append(new AutoDownscale({
-      device: this.device,
-      inputTexture: this.getOutputTexture(),
-      nativeDimensions: this.nativeDimensions,
-      targetDimensions: this.targetDimensions,
-    }));
+    this.append(
+      new AutoDownscale({
+        device: this.device,
+        inputTexture: this.getOutputTexture(),
+        nativeDimensions: this.nativeDimensions,
+        targetDimensions: this.targetDimensions,
+      }),
+    );
     return this;
   }
 }

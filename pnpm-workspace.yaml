@@ -1,0 +1,5 @@
+# pnpm settings (pnpm 11 reads these from pnpm-workspace.yaml).
+# `unrs-resolver` (used by eslint-import-resolver-typescript) ships a
+# postinstall that wires up its platform-specific native binding; allow it.
+allowBuilds:
+  unrs-resolver: true

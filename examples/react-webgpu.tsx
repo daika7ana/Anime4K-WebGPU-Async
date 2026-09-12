@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { CNNUL, CNNx2UL } from 'anime4k-webgpu-async';
+import { CNNUL, CNNx2UL, recordPipelineList } from 'anime4k-webgpu-async';
 
 const fullscreenTexturedQuadWGSL = `
 struct VertexOutput {
@@ -48,24 +48,40 @@ export const ReactWebGPU: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
     async function init() {
       // create video element
-      const video = videoRef.current!;
       video.loop = true;
       video.autoplay = true;
       video.muted = true;
       video.src = '/OnePunchMan.mp4';
-      await new Promise((resolve) => {
-        video.onloadeddata = resolve;
+      await new Promise<void>((resolve) => {
+        if (video.readyState >= video.HAVE_CURRENT_DATA) {
+          resolve();
+          return;
+        }
+        video.addEventListener('loadeddata', () => resolve(), { once: true });
       });
       await video.play();
+      if (cancelled) {
+        return;
+      }
       const WIDTH = video.videoWidth;
       const HEIGHT = video.videoHeight;
 
       // configure WebGPU
-      const canvas = canvasRef.current!;
       const adapter = await navigator.gpu.requestAdapter();
-      const device = await adapter!.requestDevice();
+      if (!adapter) {
+        throw new Error('WebGPU not supported');
+      }
+      const device = await adapter.requestDevice();
       const context = canvas.getContext('webgpu') as GPUCanvasContext;
       const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
       context.configure({
@@ -78,9 +94,10 @@ export const ReactWebGPU: React.FC = () => {
       const videoFrameTexture = device.createTexture({
         size: [WIDTH, HEIGHT, 1],
         format: 'rgba16float',
-        usage: GPUTextureUsage.TEXTURE_BINDING
-        | GPUTextureUsage.COPY_DST
-        | GPUTextureUsage.RENDER_ATTACHMENT,
+        usage:
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_DST |
+          GPUTextureUsage.RENDER_ATTACHMENT,
       });
 
       // ++++ Anime4K ++++
@@ -97,7 +114,7 @@ export const ReactWebGPU: React.FC = () => {
       canvas.height = restorePipeline.getOutputTexture().height;
       // ++++ Anime4K ++++
 
-      // function to get copy new video frame into texture
+      // function to copy new video frame into texture
       function updateVideoFrameTexture() {
         device.queue.copyExternalImageToTexture(
           { source: video },
@@ -119,7 +136,7 @@ export const ReactWebGPU: React.FC = () => {
             binding: 2,
             visibility: GPUShaderStage.FRAGMENT,
             texture: {},
-          }
+          },
         ],
       });
 
@@ -128,7 +145,7 @@ export const ReactWebGPU: React.FC = () => {
         bindGroupLayouts: [renderBindGroupLayout],
       });
 
-      const renderPipeline = device.createRenderPipeline({
+      const renderPipeline = await device.createRenderPipelineAsync({
         layout: renderPipelineLayout,
         vertex: {
           module: device.createShaderModule({
@@ -169,27 +186,31 @@ export const ReactWebGPU: React.FC = () => {
             // +++ Anime4K +++
             resource: restorePipeline.getOutputTexture().createView(),
             // +++ Anime4K +++
-          }
+          },
         ],
       });
 
-
       // render loop
       async function frame() {
+        if (cancelled) {
+          return;
+        }
         if (!video.paused) {
           updateVideoFrameTexture();
         }
         const commandEncoder = device.createCommandEncoder();
         // +++ Anime4K +++
-        await upscalePipeline.pass(commandEncoder);
-        await restorePipeline.pass(commandEncoder);
+        await recordPipelineList(commandEncoder, [upscalePipeline, restorePipeline]);
         // +++ Anime4K +++
         const passEncoder = commandEncoder.beginRenderPass({
           colorAttachments: [
             {
               view: context.getCurrentTexture().createView(),
               clearValue: {
-                r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
               },
               loadOp: 'clear' as GPULoadOp,
               storeOp: 'store' as GPUStoreOp,
@@ -200,16 +221,32 @@ export const ReactWebGPU: React.FC = () => {
         passEncoder.setBindGroup(0, renderBindGroup);
         passEncoder.draw(6);
         passEncoder.end();
+        if (cancelled) {
+          return;
+        }
         device.queue.submit([commandEncoder.finish()]);
-        video.requestVideoFrameCallback(frame);
+        if (!cancelled) {
+          video.requestVideoFrameCallback(() => {
+            void frame();
+          });
+        }
       }
 
       // start render loop
-      video.requestVideoFrameCallback(frame);
+      if (!cancelled) {
+        video.requestVideoFrameCallback(() => {
+          void frame();
+        });
+      }
     }
 
-    init();
-  }, [])
+    void init();
+
+    return () => {
+      cancelled = true;
+      video.pause();
+    };
+  }, []);
 
   return (
     <div>

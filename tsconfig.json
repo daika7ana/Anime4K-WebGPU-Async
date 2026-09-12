@@ -1,17 +1,20 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "module": "commonjs",
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "noImplicitAny": false,
     "declaration": true,
-    "outDir": "lib",
+    "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
+    "useDefineForClassFields": false,
+    "sourceMap": false,
     "types": ["@webgpu/types", "node"],
     "lib": ["ESNext", "DOM"],
-    "moduleResolution": "node"
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "lib", "**/*.spec.ts", "conversion", "examples"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "examples"]
 }

@@ -6,9 +6,12 @@ export interface RendererOptions {
   video: HTMLVideoElement;
   canvas: HTMLCanvasElement;
   // function to build custom pipeline
-  // accepts either a single pipeline (e.g. a container) or an array of pipelines
-  pipelineBuilder: (device: GPUDevice, inputTexture: GPUTexture) =>
-  Anime4KPipeline | Anime4KPipeline[];
+  // accepts either a single pipeline (e.g. a container) or an array of pipelines,
+  // and may resolve them asynchronously
+  pipelineBuilder: (
+    device: GPUDevice,
+    inputTexture: GPUTexture,
+  ) => Anime4KPipeline | Anime4KPipeline[] | Promise<Anime4KPipeline | Anime4KPipeline[]>;
 }
 
 /**
@@ -26,7 +29,8 @@ const renderLoops = new WeakMap<HTMLVideoElement, { cancelled: boolean }>();
  * @param {HTMLCanvasElement} options.canvas - The canvas element to render to.
  * @param {Function} options.pipelineBuilder - A function that builds the custom pipeline.
  * It takes a GPUDevice and a GPUTexture as parameters
- * and returns a single Anime4KPipeline or an array of Anime4KPipeline instances.
+ * and returns a single Anime4KPipeline, an array of Anime4KPipeline instances, or a
+ * Promise that resolves to either.
  * The pipelines returned will be executed in order in the render loop.
  * The output texture of the last pipeline will be rendered to the canvas.
  *
@@ -72,12 +76,13 @@ export async function render(options: RendererOptions): Promise<void> {
   const videoFrameTexture = device.createTexture({
     size: [WIDTH, HEIGHT, 1],
     format: 'rgba16float',
-    usage: GPUTextureUsage.TEXTURE_BINDING
-          | GPUTextureUsage.COPY_DST
-          | GPUTextureUsage.RENDER_ATTACHMENT,
+    usage:
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.RENDER_ATTACHMENT,
   });
 
-  const built = pipelineBuilder(device, videoFrameTexture);
+  const built = await pipelineBuilder(device, videoFrameTexture);
   const pipelines = Array.isArray(built) ? built : [built];
   if (pipelines.length === 0) {
     throw new Error('pipelineBuilder returned no pipelines');
@@ -85,11 +90,10 @@ export async function render(options: RendererOptions): Promise<void> {
 
   // function to get copy new video frame into texture
   function updateVideoFrameTexture() {
-    device.queue.copyExternalImageToTexture(
-      { source: video },
-      { texture: videoFrameTexture },
-      [WIDTH, HEIGHT],
-    );
+    device.queue.copyExternalImageToTexture({ source: video }, { texture: videoFrameTexture }, [
+      WIDTH,
+      HEIGHT,
+    ]);
   }
 
   // render pipeline setups
@@ -165,7 +169,9 @@ export async function render(options: RendererOptions): Promise<void> {
     }
     if (pending) {
       if (!loopToken.cancelled) {
-        video.requestVideoFrameCallback(frame);
+        video.requestVideoFrameCallback(() => {
+          void frame();
+        });
       }
       return;
     }
@@ -181,7 +187,10 @@ export async function render(options: RendererOptions): Promise<void> {
           {
             view: context.getCurrentTexture().createView(),
             clearValue: {
-              r: 0.0, g: 0.0, b: 0.0, a: 1.0,
+              r: 0.0,
+              g: 0.0,
+              b: 0.0,
+              a: 1.0,
             },
             loadOp: 'clear' as GPULoadOp,
             storeOp: 'store' as GPUStoreOp,
@@ -197,8 +206,12 @@ export async function render(options: RendererOptions): Promise<void> {
       }
       device.queue.submit([commandEncoder.finish()]);
       device.queue.onSubmittedWorkDone().then(
-        () => { pending = false; },
-        () => { pending = false; },
+        () => {
+          pending = false;
+        },
+        () => {
+          pending = false;
+        },
       );
     } catch (error) {
       pending = false;
@@ -206,12 +219,16 @@ export async function render(options: RendererOptions): Promise<void> {
       console.error(error);
     } finally {
       if (!loopToken.cancelled) {
-        video.requestVideoFrameCallback(frame);
+        video.requestVideoFrameCallback(() => {
+          void frame();
+        });
       }
     }
   }
   // start render loop
   if (!loopToken.cancelled) {
-    video.requestVideoFrameCallback(frame);
+    video.requestVideoFrameCallback(() => {
+      void frame();
+    });
   }
 }

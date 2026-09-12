@@ -35,15 +35,12 @@ export async function recordPipelineList(
       const executionOrder = p.getExecutionOrder?.();
       if (executionOrder) {
         // Flatten composites and keep sharing the open compute pass.
-        // eslint-disable-next-line no-await-in-loop
         await record(executionOrder);
       } else if (p.isCompute === true && typeof p.recordCompute === 'function') {
         if (!computePass) computePass = encoder.beginComputePass();
-        // eslint-disable-next-line no-await-in-loop
         await p.recordCompute(computePass);
       } else {
         closeComputePass();
-        // eslint-disable-next-line no-await-in-loop
         await p.pass(encoder);
       }
     }

@@ -50,27 +50,43 @@ export class CNNUL implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtfWGSL, conv2dtf1WGSL, conv2dtf2WGSL,
-      conv2d1tfWGSL, conv2d1tf1WGSL, conv2d1tf2WGSL,
-      conv2d2tfWGSL, conv2d2tf1WGSL, conv2d2tf2WGSL,
-      conv2d3tfWGSL, conv2d3tf1WGSL, conv2d3tf2WGSL,
-      conv2d4tfWGSL, conv2d4tf1WGSL, conv2d4tf2WGSL,
-      conv2d5tfWGSL, conv2d5tf1WGSL, conv2d5tf2WGSL,
-      conv2d6tfWGSL, conv2d6tf1WGSL, conv2d6tf2WGSL,
-      conv2d7tfWGSL, conv2d7tf1WGSL, conv2d7tf2WGSL];
+      conv2dtfWGSL,
+      conv2dtf1WGSL,
+      conv2dtf2WGSL,
+      conv2d1tfWGSL,
+      conv2d1tf1WGSL,
+      conv2d1tf2WGSL,
+      conv2d2tfWGSL,
+      conv2d2tf1WGSL,
+      conv2d2tf2WGSL,
+      conv2d3tfWGSL,
+      conv2d3tf1WGSL,
+      conv2d3tf2WGSL,
+      conv2d4tfWGSL,
+      conv2d4tf1WGSL,
+      conv2d4tf2WGSL,
+      conv2d5tfWGSL,
+      conv2d5tf1WGSL,
+      conv2d5tf2WGSL,
+      conv2d6tfWGSL,
+      conv2d6tf1WGSL,
+      conv2d6tf2WGSL,
+      conv2d7tfWGSL,
+      conv2d7tf1WGSL,
+      conv2d7tf2WGSL,
+    ];
 
     for (let i = 0; i < 3; i += 1) {
-      this.pipelines.push(new Conv2d({
-        device,
-        inputTextures: [inputTexture],
-        shaderWGSL: shaders[i],
-        name: `conv2d_tf_${i}`,
-      }));
+      this.pipelines.push(
+        new Conv2d({
+          device,
+          inputTextures: [inputTexture],
+          shaderWGSL: shaders[i],
+          name: `conv2d_tf_${i}`,
+        }),
+      );
     }
 
     const outputTextures: GPUTexture[] = [];
@@ -78,28 +94,34 @@ export class CNNUL implements Anime4KPipeline {
       outputTextures.length = 0;
       this.fillOutputTextures(outputTextures, (i - 1) * 3, 3);
       for (let j = 0; j < 3; j += 1) {
-        this.pipelines.push(new Conv2d({
-          device,
-          inputTextures: outputTextures,
-          shaderWGSL: shaders[i * 3 + j],
-          name: `conv2d_${i}_tf_${j}`,
-        }));
+        this.pipelines.push(
+          new Conv2d({
+            device,
+            inputTextures: outputTextures,
+            shaderWGSL: shaders[i * 3 + j],
+            name: `conv2d_${i}_tf_${j}`,
+          }),
+        );
       }
     }
 
     outputTextures.length = 0;
     this.fillOutputTextures(outputTextures, 9, 15);
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: outputTextures,
-      shaderWGSL: output,
-      name: 'output',
-    }));
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
-      outputTextureSize: [inputTexture.width, inputTexture.height],
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: outputTextures,
+        shaderWGSL: output,
+        name: 'output',
+      }),
+    );
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.pipelines[this.pipelines.length - 1].getOutputTexture()],
+        outputTextureSize: [inputTexture.width, inputTexture.height],
+      }),
+    );
   }
 
   private fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {
@@ -108,12 +130,11 @@ export class CNNUL implements Anime4KPipeline {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   updateParam(param: string, value: any): void {
     throw new Error(`${this.constructor.name} has no param`);
   }
 
-  getOutputTexture() : GPUTexture {
+  getOutputTexture(): GPUTexture {
     return this.pipelines[this.pipelines.length - 1].getOutputTexture();
   }
 

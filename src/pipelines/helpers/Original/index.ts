@@ -3,7 +3,7 @@ import { Anime4KPipeline, OriginalPipelineDescriptor } from '../../interfaces';
 /**
  * Original pipeline
  *    Output the input texture without any change.
-*/
+ */
 export class Original implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
@@ -13,9 +13,7 @@ export class Original implements Anime4KPipeline {
    * @param {Object} options - The options for the Original pipeline.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    inputTexture,
-  }: OriginalPipelineDescriptor) {
+  constructor({ inputTexture }: OriginalPipelineDescriptor) {
     this.outputTexture = inputTexture;
   }
 

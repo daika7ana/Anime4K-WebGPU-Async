@@ -4,7 +4,7 @@ import { Anime4KPipeline, Conv2dPipelineDescriptor } from '../../interfaces';
  * Conv2d pipeline
  *    Takes in n input textures output texture. All input textures and output texture
  * have the same dimensions.
-*/
+ */
 export class Conv2d implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
@@ -30,12 +30,7 @@ export class Conv2d implements Anime4KPipeline {
    * @throws {Error} Will throw an error if no input textures are provided.
    * @throws {Error} Will throw an error if the shader is not defined.
    */
-  constructor({
-    device,
-    inputTextures,
-    shaderWGSL,
-    name = 'conv2d',
-  }: Conv2dPipelineDescriptor) {
+  constructor({ device, inputTextures, shaderWGSL, name = 'conv2d' }: Conv2dPipelineDescriptor) {
     this.name = name;
     const inputLength = inputTextures.length;
     if (inputLength === 0) {

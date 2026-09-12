@@ -2,11 +2,13 @@
 node_modules/
 bower_components/
 
+# Lockfiles — pnpm only (package-lock.json is not used)
+package-lock.json
+
 # TypeScript compiled files
 dist/
 build/
 out/
-lib/
 *.tsbuildinfo
 
 # Logs

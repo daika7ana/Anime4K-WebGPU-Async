@@ -1,0 +1,19 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Excluded from the TypeScript build / tooling (see AGENTS.md)
+examples/
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Docs (avoid churn)
+*.md
+
+# Generated / binary assets and internal cache
+images/
+.codegraph/
+coverage/

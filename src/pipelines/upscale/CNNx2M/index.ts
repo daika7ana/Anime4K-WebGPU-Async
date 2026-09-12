@@ -22,14 +22,17 @@ export class CNNx2M implements Anime4KPipeline {
    * creating textures and shader modules.
    * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
    */
-  constructor({
-    device,
-    inputTexture,
-  }: Anime4KPipelineDescriptor) {
+  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
     const shaders: string[] = [
-      conv2dtfWGSL, conv2d1tfWGSL, conv2d2tfWGSL,
-      conv2d3tfWGSL, conv2d4tfWGSL, conv2d5tfWGSL,
-      conv2d6tfWGSL, conv2dlasttfWGSL];
+      conv2dtfWGSL,
+      conv2d1tfWGSL,
+      conv2d2tfWGSL,
+      conv2d3tfWGSL,
+      conv2d4tfWGSL,
+      conv2d5tfWGSL,
+      conv2d6tfWGSL,
+      conv2dlasttfWGSL,
+    ];
 
     this.pushPipeline(device, [inputTexture], shaders[0], 'conv2d_tf');
 
@@ -50,16 +53,20 @@ export class CNNx2M implements Anime4KPipeline {
     outputTextures.push(this.getOutputTexture());
     outputTextures.push(this.getOutputTexture());
 
-    this.pipelines.push(new DepthToSpace({
-      device,
-      inputTextures: outputTextures,
-      name: 'DepthToSpace',
-    }));
-    this.pipelines.push(new Overlay({
-      device,
-      inputTextures: [inputTexture, this.getOutputTexture()],
-      outputTextureSize: [2 * inputTexture.width, 2 * inputTexture.height],
-    }));
+    this.pipelines.push(
+      new DepthToSpace({
+        device,
+        inputTextures: outputTextures,
+        name: 'DepthToSpace',
+      }),
+    );
+    this.pipelines.push(
+      new Overlay({
+        device,
+        inputTextures: [inputTexture, this.getOutputTexture()],
+        outputTextureSize: [2 * inputTexture.width, 2 * inputTexture.height],
+      }),
+    );
   }
 
   updateParam(param: string, value: any): void {
@@ -84,12 +91,14 @@ export class CNNx2M implements Anime4KPipeline {
     shaderWGSL: string,
     name: string,
   ): void {
-    this.pipelines.push(new Conv2d({
-      device,
-      inputTextures: inputTexture,
-      shaderWGSL,
-      name,
-    }));
+    this.pipelines.push(
+      new Conv2d({
+        device,
+        inputTextures: inputTexture,
+        shaderWGSL,
+        name,
+      }),
+    );
   }
 
   private fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {

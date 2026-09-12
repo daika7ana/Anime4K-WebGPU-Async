@@ -1,8 +1,4 @@
-import {
-  Anime4KPipeline,
-  Anime4KPipelineDescriptor,
-  Dimensions,
-} from '../../interfaces';
+import { Anime4KPipeline, Anime4KPipelineDescriptor, Dimensions } from '../../interfaces';
 import { Downscale } from '../Downscale';
 
 export const AUTO_DOWNSCALE_THRESHOLDS = {
@@ -32,14 +28,14 @@ export function planAutoDownscale(
   native: Dimensions,
   target: Dimensions,
 ): AutoDownscalePlan | null {
-  const {
-    UPSCALE_MIN, X2_MAX, X4_MIN, X4_MAX,
-  } = AUTO_DOWNSCALE_THRESHOLDS;
+  const { UPSCALE_MIN, X2_MAX, X4_MIN, X4_MAX } = AUTO_DOWNSCALE_THRESHOLDS;
 
-  if (target.width > UPSCALE_MIN * native.width
-      && target.height > UPSCALE_MIN * native.height
-      && target.width < X2_MAX * native.width
-      && target.height < X2_MAX * native.height) {
+  if (
+    target.width > UPSCALE_MIN * native.width &&
+    target.height > UPSCALE_MIN * native.height &&
+    target.width < X2_MAX * native.width &&
+    target.height < X2_MAX * native.height
+  ) {
     return {
       factor: 2,
       downscaleTo: { width: target.width, height: target.height },
@@ -48,10 +44,12 @@ export function planAutoDownscale(
 
   // Intentional gap: no downscale for [2.0x, 2.4x] ratios.
 
-  if (target.width > X4_MIN * native.width
-      && target.height > X4_MIN * native.height
-      && target.width < X4_MAX * native.width
-      && target.height < X4_MAX * native.height) {
+  if (
+    target.width > X4_MIN * native.width &&
+    target.height > X4_MIN * native.height &&
+    target.width < X4_MAX * native.width &&
+    target.height < X4_MAX * native.height
+  ) {
     return {
       factor: 4,
       // Half the target on each axis, rounded up (matches the presets).
@@ -65,6 +63,18 @@ export function planAutoDownscale(
   return null;
 }
 
+/** Pure predicate shared by legacy autoUpscaleX2 and the engine composer. */
+export function shouldUpscaleX2(
+  currentDimensions: Dimensions,
+  targetDimensions: Dimensions,
+): boolean {
+  const { UPSCALE_MIN } = AUTO_DOWNSCALE_THRESHOLDS;
+  return (
+    targetDimensions.width > UPSCALE_MIN * currentDimensions.width &&
+    targetDimensions.height > UPSCALE_MIN * currentDimensions.height
+  );
+}
+
 /**
  * Create an x2 upscaler only when the target strictly exceeds 1.2x the current
  * input texture on both axes.
@@ -75,10 +85,9 @@ export function autoUpscaleX2<T extends Anime4KPipeline>(
   targetDimensions: Dimensions,
   create: (o: Anime4KPipelineDescriptor) => T,
 ): T | null {
-  const { UPSCALE_MIN } = AUTO_DOWNSCALE_THRESHOLDS;
-
-  if (targetDimensions.width > UPSCALE_MIN * inputTexture.width
-      && targetDimensions.height > UPSCALE_MIN * inputTexture.height) {
+  if (
+    shouldUpscaleX2({ width: inputTexture.width, height: inputTexture.height }, targetDimensions)
+  ) {
     return create({ device, inputTexture });
   }
 
@@ -127,9 +136,7 @@ export class AutoDownscale implements Anime4KPipeline {
 
     if (!this.downscale) {
       // x2 downscales straight to the target; x4 downscales to half of it.
-      const downscaleTo = this.plan.factor === 2
-        ? this.targetDimensions
-        : this.plan.downscaleTo;
+      const downscaleTo = this.plan.factor === 2 ? this.targetDimensions : this.plan.downscaleTo;
 
       this.downscale = new Downscale({
         device: this.device,
