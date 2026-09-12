@@ -47,7 +47,7 @@ export class PresetPipeline extends PipelineChain {
   ): this {
     const upscale = autoUpscaleX2(
       this.device,
-      this.getOutputTexture(),
+      this.getTailTexture(),
       this.targetDimensions,
       (descriptor) => new Ctor(descriptor),
     );
@@ -60,7 +60,7 @@ export class PresetPipeline extends PipelineChain {
     this.append(
       new AutoDownscale({
         device: this.device,
-        inputTexture: this.getOutputTexture(),
+        inputTexture: this.getTailTexture(),
         nativeDimensions: this.nativeDimensions,
         targetDimensions: this.targetDimensions,
       }),

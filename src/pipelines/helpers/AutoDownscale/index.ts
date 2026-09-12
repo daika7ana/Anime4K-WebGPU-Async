@@ -96,7 +96,7 @@ export function autoUpscaleX2<T extends Anime4KPipeline>(
 
 /**
  * Pipeline wrapper around the preset auto-downscale heuristic. Composes the
- * existing render-based `Downscale`; it does not duplicate any WGSL.
+ * existing compute-based `Downscale`; it does not duplicate any WGSL.
  *
  * When the plan is `null` the wrapper is inactive: `pass()` is a no-op and
  * `getOutputTexture()` returns the input texture unchanged.

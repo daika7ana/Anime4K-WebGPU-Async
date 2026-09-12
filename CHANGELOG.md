@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.1.0] - 2026-09-12
+
+### Added
+
+- `ClampHighlightsApply`, the deferred clamp stage of `ClampHighlights` (exported through the helpers barrel), and the optional `Anime4KPipeline.getDeferredPipeline` capability that `PipelineChain` / `ComposedPipeline` use to run it once after the last node.
+
+### Changed
+
+- The public `ClampHighlights` class is now the stats-only pass-through stage: its previous `pipelines.clampPipeline` / `bindGroups.clampBindGroup` internals have moved to the new `ClampHighlightsApply`, and its `outputTexture` now aliases the input texture. Code reading those stats-stage internals or expecting `ClampHighlights` to clamp in place should use `ClampHighlightsApply` (or a chain, which defers it automatically).
+- `Downscale` switched from a single bilinear fullscreen **render** tap to a **compute** fractional-box filter that averages in linear light (sRGB decode → filter → sRGB encode), removing phase-dependent aliasing/shimmer at non-integer ratios. It now exposes `isCompute` / `recordCompute` so `recordPipelineList` batches it with adjacent compute nodes, and its output texture no longer requires `RENDER_ATTACHMENT` (usage is `TEXTURE_BINDING | STORAGE_BINDING`).
+- `Downscale`'s internal fields are now `pipelines` (holding `downscalePipeline`) and `bindGroups` (holding `downscaleBindGroup`), replacing the old render `pipeline` / `bindGroup` fields. `Downscale` is root-exported, so code reading those internals needs updating.
+
+### Fixed
+
+- `ClampHighlights` was an identity in practice: its stats and clamp passes ran back-to-back on the same texture, so `min(luma, localMax) == luma`. It is now a genuine two-stage effect — the 5x5 local-max stats are captured at the insertion point and the clamp is applied to the final frame — matching upstream.
+- `PipelineChain.add(...)` did not advance the chain tail, so the legacy `ModeA`..`ModeCA` preset classes bound the original video texture to every `addNode` effect. It now appends through the same path as `append()`, threading intermediate textures (and registering deferrals), which makes the legacy presets structurally identical to `ComposedPipeline.fromPreset`.
+
 ## [3.0.0]
 
 ### Breaking

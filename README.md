@@ -167,10 +167,10 @@ pipeline.updateParam('strength', 3.0);
 ```
 
 `inputTexture` must have usage `TEXTURE_BINDING`. Output texture usage depends on the pipeline:
-render-based helpers (e.g. `Overlay`, `Downscale`) expose
+render-based helpers (e.g. `Overlay`) expose
 `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING`, while compute-based helpers (e.g.
-`Conv2d`, `ClampHighlights`) only need `TEXTURE_BINDING | STORAGE_BINDING`. Pipelines can be
-chained in tandem for more sophisticated effects.
+`Conv2d`, `ClampHighlights`, `Downscale`) only need `TEXTURE_BINDING | STORAGE_BINDING`. Pipelines
+can be chained in tandem for more sophisticated effects.
 
 ### 3. Engine-backed composition
 
@@ -236,11 +236,34 @@ tier-parameterized weights.
 | Denoise | `BilateralMean` |
 | Restore | `CNNM`, `CNNSoftM`, `CNNSoftVL`, `CNNVL`, `CNNUL`, `GANUUL` |
 | Upscale | `CNNx2M`, `CNNx2VL`, `CNNx2UL`, `DenoiseCNNx2VL`, `GANx3L`, `GANx4UUL` |
-| Helpers | `Conv2d`, `DepthToSpace`, `Overlay`, `Original`, `Downscale`, `ClampHighlights`, `AutoDownscale` |
+| Helpers | `Conv2d`, `DepthToSpace`, `Overlay`, `Original`, `Downscale`, `ClampHighlights`, `ClampHighlightsApply`, `AutoDownscale` |
 | Presets | `ModeA`, `ModeAA`, `ModeB`, `ModeBB`, `ModeC`, `ModeCA` ([reference](https://github.com/bloc97/Anime4K/blob/master/md/GLSL_Instructions_Advanced.md)) |
 
 For custom chains, the primitives `PipelineChain`, `PresetPipeline`, `recordPipelineList`,
 `AutoDownscale` and `planAutoDownscale` are exported as well.
+
+`ClampHighlights` is a two-stage effect matching upstream Anime4K. When it is appended to a
+chain, the stats stage (`ClampHighlights`) runs at the insertion point and captures a 5x5
+local-max luma statistics texture without modifying the frame; it is a pass-through
+(`getOutputTexture()` returns its input). The clamp stage (`ClampHighlightsApply`) is deferred:
+`PipelineChain` / `ComposedPipeline` automatically run it once after the last node, at the final
+output resolution, clamping the final frame's luma against the captured stats. Because the stats
+may be at a different resolution than the final frame, `ClampHighlightsApply` samples them
+bilinearly with normalized coordinates. The 5x5 max intentionally includes the center tap, as
+upstream does.
+
+`Downscale` is a compute node implementing a ratio-scaled fractional-coverage box filter: each
+output texel averages the source texels it overlaps, weighted by their fractional coverage on each
+axis. Averaging is performed in linear light (the sRGB-encoded input is decoded, filtered, then
+re-encoded), which avoids the phase-dependent aliasing and shimmer of a single bilinear tap at
+non-integer ratios. Its output no longer needs `RENDER_ATTACHMENT`.
+
+`Downscale` assumes display-encoded (sRGB) input, matching the renderer's video texture and the
+CNN chain's output; feeding it a linear-light intermediate would average in a distorted space.
+Alpha is averaged and preserved (the video path is opaque); the previous bilinear tap force-cleared
+alpha to 1. Cost scales with the ratio squared per output — roughly 9 source loads per output for
+the auto-downscale ratios in `(1.0, 1.67)` — so extreme direct-use ratios are correct but
+expensive.
 
 ## Performance
 

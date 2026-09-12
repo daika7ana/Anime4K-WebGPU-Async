@@ -108,7 +108,7 @@ export class ComposedPipeline extends PipelineChain {
   }
 
   private async addEffect(backend: AlgorithmBackend, ref: EffectReference): Promise<void> {
-    const inputTexture = this.getOutputTexture();
+    const inputTexture = this.getTailTexture();
     const compiled = await backend.compileEffect(ref, {
       device: this.device,
       inputTexture,
@@ -123,7 +123,7 @@ export class ComposedPipeline extends PipelineChain {
   }
 
   private needsUpscaleX2(): boolean {
-    const t = this.getOutputTexture();
+    const t = this.getTailTexture();
     return shouldUpscaleX2({ width: t.width, height: t.height }, this.targetDimensions);
   }
 
@@ -131,7 +131,7 @@ export class ComposedPipeline extends PipelineChain {
     this.append(
       new AutoDownscale({
         device: this.device,
-        inputTexture: this.getOutputTexture(),
+        inputTexture: this.getTailTexture(),
         nativeDimensions: this.nativeDimensions,
         targetDimensions: this.targetDimensions,
       }),

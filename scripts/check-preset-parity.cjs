@@ -87,10 +87,28 @@ function assertRequiredExports(bundle) {
 }
 
 /* -------------------------------------------------------------------------- *
- * Mock GPU device / encoder. Every creation call is appended (in order) to the
- * trace array supplied by the caller.
+ * Resource identity. A per-side monotonic counter gives every created GPU
+ * resource a stable identity so bind groups can be compared by *what* they
+ * bind, not by labels (which repeat across effects). Views inherit their
+ * parent texture's identity, because the F2 tail-threading bug binds the wrong
+ * texture, not merely a different view object.
  * -------------------------------------------------------------------------- */
-function makeMockDevice(trace) {
+function makeResourceIds() {
+  let nextId = 0;
+  return {
+    next() {
+      nextId += 1;
+      return nextId;
+    },
+  };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Mock GPU device / encoder. Every creation call is appended (in order) to the
+ * trace array supplied by the caller. `bindTrace` (optional) additionally
+ * records the resource identity bound at every `createBindGroup` entry.
+ * -------------------------------------------------------------------------- */
+function makeMockDevice(trace, ids = makeResourceIds(), bindTrace = null) {
   const log = (entry) => trace.push(entry);
 
   return {
@@ -98,6 +116,7 @@ function makeMockDevice(trace) {
       const size = Array.isArray(desc.size) ? desc.size : [0, 0, 1];
       const width = size[0];
       const height = size[1];
+      const resourceId = ids.next();
       log({
         op: 'createTexture',
         label: desc.label,
@@ -108,8 +127,9 @@ function makeMockDevice(trace) {
         label: desc.label,
         width,
         height,
+        __resourceId: resourceId,
         createView() {
-          return {};
+          return { __resourceId: resourceId, __resourceKind: 'texture' };
         },
       };
     },
@@ -135,17 +155,28 @@ function makeMockDevice(trace) {
     },
     createBindGroup(desc = {}) {
       log({ op: 'createBindGroup', label: desc.label });
+      if (bindTrace) {
+        const entries = Array.isArray(desc.entries) ? desc.entries : [];
+        const args = [];
+        entries.forEach((entry) => {
+          const resource = entry && entry.resource;
+          const resourceId =
+            resource && resource.__resourceId !== undefined ? resource.__resourceId : null;
+          args.push(entry ? entry.binding : null, resourceId);
+        });
+        bindTrace.push({ op: 'createBindGroup', label: desc.label, args });
+      }
       return {};
     },
     createSampler(desc = {}) {
       log({ op: 'createSampler', label: desc && desc.label });
-      return {};
+      return { __resourceId: ids.next(), __resourceKind: 'sampler' };
     },
     // Defensive: not exercised by the current preset path, but keeps the mock
     // shape-tolerant if a pipeline starts creating buffers.
     createBuffer(desc = {}) {
       log({ op: 'createBuffer', label: desc.label });
-      return {};
+      return { __resourceId: ids.next(), __resourceKind: 'buffer' };
     },
     queue: {
       copyExternalImageToTexture() {},
@@ -209,13 +240,15 @@ function makeMockEncoder(trace) {
   };
 }
 
-function makeInputTexture({ width, height }) {
+function makeInputTexture({ width, height }, ids = makeResourceIds()) {
+  const resourceId = ids.next();
   return {
     label: 'input texture',
     width,
     height,
+    __resourceId: resourceId,
     createView() {
-      return {};
+      return { __resourceId: resourceId, __resourceKind: 'texture' };
     },
   };
 }
@@ -307,6 +340,19 @@ function flattenExecution(node, out = []) {
   return out;
 }
 
+/** Flatten to the actual nodes (not just their dims/isCompute entries). */
+function flattenNodes(node, out = []) {
+  if (typeof node.getExecutionOrder === 'function') {
+    const order = node.getExecutionOrder() || [];
+    for (let i = 0; i < order.length; i += 1) {
+      flattenNodes(order[i], out);
+    }
+  } else {
+    out.push(node);
+  }
+  return out;
+}
+
 function dimsOf(node) {
   const texture = node.getOutputTexture();
   return { width: texture.width, height: texture.height };
@@ -393,11 +439,13 @@ async function checkCell(ModeClass, registry, modeId, cell) {
 
   // 1) legacy preset.
   const legacyTrace = [];
+  const legacyBindTrace = [];
+  const legacyIds = makeResourceIds();
   let legacyPipeline = null;
   try {
     legacyPipeline = new ModeClass({
-      device: makeMockDevice(legacyTrace),
-      inputTexture: makeInputTexture(native),
+      device: makeMockDevice(legacyTrace, legacyIds, legacyBindTrace),
+      inputTexture: makeInputTexture(native, legacyIds),
       nativeDimensions: { ...native },
       targetDimensions: { ...target },
     });
@@ -407,11 +455,14 @@ async function checkCell(ModeClass, registry, modeId, cell) {
 
   // 2) composed pipeline.
   const composedTrace = [];
+  const composedBindTrace = [];
+  const composedIds = makeResourceIds();
+  const composedInputTexture = makeInputTexture(native, composedIds);
   let composedPipeline = null;
   try {
     composedPipeline = await bundle.ComposedPipeline.fromPreset({
-      device: makeMockDevice(composedTrace),
-      inputTexture: makeInputTexture(native),
+      device: makeMockDevice(composedTrace, composedIds, composedBindTrace),
+      inputTexture: composedInputTexture,
       nativeDimensions: { ...native },
       targetDimensions: { ...target },
       registry,
@@ -440,6 +491,17 @@ async function checkCell(ModeClass, registry, modeId, cell) {
     if (orderDiff) failures.push({ check: 'execution order', detail: orderDiff });
   } catch (err) {
     failures.push({ check: 'execution order threw', detail: errorText(err) });
+  }
+
+  // 4b) bind-resource trace. Flattening above materialized the deferred
+  // ClampHighlightsApply stage on both sides, so every bind group has been
+  // created. Comparing *which* resource is bound catches the F2 tail-threading
+  // bug that labels/dims cannot (a wrong texture can share a label and size).
+  try {
+    const bindDiff = diffEntries(legacyBindTrace, composedBindTrace);
+    if (bindDiff) failures.push({ check: 'bind resource trace', detail: bindDiff });
+  } catch (err) {
+    failures.push({ check: 'bind resource trace threw', detail: errorText(err) });
   }
 
   // 5) final output dimensions.
@@ -480,6 +542,47 @@ async function checkCell(ModeClass, registry, modeId, cell) {
     composedPipeline.updateParam('__parity_noop__', 0);
   } catch (err) {
     failures.push({ check: 'composed updateParam threw', detail: errorText(err) });
+  }
+
+  // 8) two-stage ClampHighlights structure. This is a structural assertion only
+  // and must not disturb the legacy-vs-composed comparisons above.
+  try {
+    const order = composedPipeline.getExecutionOrder();
+    const flattened = [];
+    for (let i = 0; i < order.length; i += 1) {
+      flattenNodes(order[i], flattened);
+    }
+    const last = flattened[flattened.length - 1];
+    const lastCtor = last && last.constructor && last.constructor.name;
+    if (lastCtor !== 'ClampHighlightsApply' || last.isCompute !== true) {
+      failures.push({
+        check: 'ClampHighlightsApply placement',
+        detail:
+          `expected last node ClampHighlightsApply (isCompute=true), got ` +
+          `${lastCtor} (isCompute=${last ? last.isCompute : '<none>'})`,
+      });
+    }
+  } catch (err) {
+    failures.push({ check: 'ClampHighlightsApply placement threw', detail: errorText(err) });
+  }
+
+  try {
+    const clampNode = composedPipeline.pipelines.find(
+      (node) => node.constructor && node.constructor.name === 'ClampHighlights',
+    );
+    if (!clampNode) {
+      failures.push({
+        check: 'ClampHighlights node',
+        detail: 'no ClampHighlights node found in composedPipeline.pipelines',
+      });
+    } else if (clampNode.getOutputTexture() !== composedInputTexture) {
+      failures.push({
+        check: 'ClampHighlights pass-through',
+        detail: 'ClampHighlights.getOutputTexture() is not the pipeline input texture',
+      });
+    }
+  } catch (err) {
+    failures.push({ check: 'ClampHighlights pass-through threw', detail: errorText(err) });
   }
 
   return failures;

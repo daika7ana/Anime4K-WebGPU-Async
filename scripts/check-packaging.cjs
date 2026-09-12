@@ -354,12 +354,25 @@ async function checkCatalogCompilation() {
     const descriptor = anime4kEffectDescriptors[i];
     const ref = { id: descriptor.id, backendId: descriptor.backendId, key: descriptor.key };
     try {
+      const context = makeCompileContext(device);
       // eslint-disable-next-line no-await-in-loop
-      const node = await backend.compileEffect(ref, makeCompileContext(device));
+      const node = await backend.compileEffect(ref, context);
       const pipeline = node && node.pipeline;
       if (!pipeline || typeof pipeline.getOutputTexture !== 'function') {
         fail('catalog compilation', `${descriptor.key}: compileEffect returned no pipeline`);
       } else {
+        // Two-stage effects (e.g. ClampHighlights) keep their second stage
+        // lazily constructed; materialize it so its shaders are captured by the
+        // shader-parity check below.
+        if (typeof pipeline.getDeferredPipeline === 'function') {
+          const deferred = pipeline.getDeferredPipeline(context.inputTexture);
+          if (!deferred || typeof deferred.getOutputTexture !== 'function') {
+            fail(
+              'catalog compilation',
+              `${descriptor.key}: getDeferredPipeline returned no pipeline`,
+            );
+          }
+        }
         compiled.push(descriptor.key);
       }
     } catch (err) {
@@ -375,6 +388,26 @@ async function checkCatalogCompilation() {
   console.log(
     `  catalog compilation: ${compiled.length}/${anime4kEffectDescriptors.length} effects compiled`,
   );
+
+  // `Downscale` is not a catalog effect (it backs the auto-downscale preset
+  // node), so the sweep above never constructs it. Construct it directly so
+  // its shader is captured and covered by the shader-parity assertion.
+  const downscalePath = path.join(ROOT, 'dist', 'pipelines', 'helpers', 'Downscale', 'index.js');
+  try {
+    const { Downscale } = await import(`${pathToUrl(downscalePath)}`);
+    if (typeof Downscale !== 'function') {
+      fail('shader parity', 'dist Downscale module does not export a Downscale class');
+    } else {
+      const context = makeCompileContext(device);
+      new Downscale({
+        device,
+        inputTexture: context.inputTexture,
+        targetDimensions: { width: 32, height: 32 },
+      });
+    }
+  } catch (err) {
+    fail('shader parity', `cannot construct Downscale from dist: ${errorText(err)}`);
+  }
 
   state.shaderCaptures = captures;
 }

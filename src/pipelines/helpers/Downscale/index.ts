@@ -1,19 +1,20 @@
-import {
-  Anime4KPipeline,
-  Anime4KPipelineDescriptor,
-  DownscalePipelineDescriptor,
-} from '../../interfaces';
-import vertexWGSL from './shaders/vertex.wgsl';
-import fragmentWGSL from './shaders/fragment.wgsl';
+import { Anime4KPipeline, DownscalePipelineDescriptor } from '../../interfaces';
+import downscaleWGSL from './shaders/downscale.wgsl';
 
 export class Downscale implements Anime4KPipeline {
   outputTexture: GPUTexture;
 
-  pipeline: Promise<GPURenderPipeline>;
+  pipelines: {
+    downscalePipeline: Promise<GPUComputePipeline>;
+  };
 
-  bindGroup: GPUBindGroup;
+  bindGroups: {
+    downscaleBindGroup: GPUBindGroup;
+  };
 
   name: string;
+
+  readonly isCompute = true;
 
   constructor({
     device,
@@ -28,108 +29,87 @@ export class Downscale implements Anime4KPipeline {
       label: `${name} output texture`,
       size: [targetDimensions.width, targetDimensions.height, 1],
       format: 'rgba16float',
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.STORAGE_BINDING,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
+    });
+
+    // bindGroupLayouts
+    const downscaleBindGroupLayout = device.createBindGroupLayout({
+      label: `${name} bind group layout`,
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: {},
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba16float',
+          },
+        },
+      ],
     });
 
     // modules
-    const vertexModule = device.createShaderModule({
-      label: 'vertex module',
-      code: vertexWGSL,
+    const downscaleModule = device.createShaderModule({
+      label: `${name} downscale module`,
+      code: downscaleWGSL,
     });
 
-    const fragmentModule = device.createShaderModule({
-      label: 'fragment module',
-      code: fragmentWGSL,
-    });
-
-    const renderBindGroupLayout = device.createBindGroupLayout({
-      label: 'Render Bind Group Layout',
-      entries: [
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: {},
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: {},
-        },
-      ],
-    });
-
-    const renderPipelineLayout = device.createPipelineLayout({
+    // pipeline layouts
+    const downscalePipelineLayout = device.createPipelineLayout({
       label: `${name} pipeline layout`,
-      bindGroupLayouts: [renderBindGroupLayout],
+      bindGroupLayouts: [downscaleBindGroupLayout],
     });
 
-    this.pipeline = device.createRenderPipelineAsync({
-      layout: renderPipelineLayout,
-      vertex: {
-        module: vertexModule,
-        entryPoint: 'vert_main',
-      },
-      fragment: {
-        module: fragmentModule,
-        entryPoint: 'main',
-        targets: [
+    this.pipelines = {
+      downscalePipeline: device.createComputePipelineAsync({
+        label: `${name} downscale pipeline`,
+        layout: downscalePipelineLayout,
+        compute: {
+          module: downscaleModule,
+          entryPoint: 'computeMain',
+        },
+      }),
+    };
+
+    this.bindGroups = {
+      downscaleBindGroup: device.createBindGroup({
+        label: `${name} bind group`,
+        layout: downscaleBindGroupLayout,
+        entries: [
           {
-            format: 'rgba16float',
+            binding: 0,
+            resource: inputTexture.createView(),
+          },
+          {
+            binding: 1,
+            resource: this.outputTexture.createView(),
           },
         ],
-      },
-      primitive: {
-        topology: 'triangle-list',
-      },
-    });
-
-    const sampler = device.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
-
-    this.bindGroup = device.createBindGroup({
-      layout: renderBindGroupLayout,
-      entries: [
-        {
-          binding: 1,
-          resource: sampler,
-        },
-        {
-          binding: 2,
-          resource: inputTexture.createView(),
-        },
-      ],
-    });
+      }),
+    };
   }
 
   updateParam(param: string, value: any): void {
     throw new Error(`${this.name} has no param`);
   }
 
+  async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
+    pass.setPipeline(await this.pipelines.downscalePipeline);
+    pass.setBindGroup(0, this.bindGroups.downscaleBindGroup);
+    pass.dispatchWorkgroups(
+      Math.ceil(this.outputTexture.width / 8),
+      Math.ceil(this.outputTexture.height / 8),
+    );
+  }
+
   async pass(encoder: GPUCommandEncoder): Promise<void> {
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: this.outputTexture.createView(),
-          clearValue: {
-            r: 0.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
-          },
-          loadOp: 'clear' as GPULoadOp,
-          storeOp: 'store' as GPUStoreOp,
-        },
-      ],
-    });
-    pass.setPipeline(await this.pipeline);
-    pass.setBindGroup(0, this.bindGroup);
-    pass.draw(6);
-    pass.end();
+    const computePass = encoder.beginComputePass();
+    await this.recordCompute(computePass);
+    computePass.end();
   }
 
   getOutputTexture(): GPUTexture {

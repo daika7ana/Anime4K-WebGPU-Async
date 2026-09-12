@@ -1,26 +1,44 @@
 import { Anime4KPipeline, ClampHighlightsPipelineDescriptor } from '../../interfaces';
 import luminationXWGSL from './shaders/luminationX.wgsl';
 import luminationYWGSL from './shaders/luminationY.wgsl';
-import clampWGSL from './shaders/clamp.wgsl';
+import { ClampHighlightsApply } from './Apply';
 
+/**
+ * Stats-capture stage of `ClampHighlights`.
+ *
+ * Upstream `Anime4K_Clamp_Highlights.glsl` is a TWO-STAGE effect: the luma
+ * statistics are captured when the effect is inserted (mpv `MAIN` hook, which
+ * does not modify the hooked image), while the actual clamp runs after all
+ * enhancement shaders (mpv `PREKERNEL` hook) against the final frame.
+ *
+ * This class only runs the stats passes: `luminationX` writes a horizontal
+ * 5-tap luma max and `luminationY` writes a vertical 5-tap max of that, giving
+ * a 5x5 local max that INCLUDES the center tap. The center tap is intentional
+ * and matches upstream; it must not be removed. The connected
+ * {@link ClampHighlightsApply} stage, produced lazily by
+ * {@link getDeferredPipeline}, consumes `statsY` and runs once at the end of a
+ * chain (see `PipelineChain`).
+ */
 export class ClampHighlights implements Anime4KPipeline {
   name: string;
 
   pipelines: {
     luminationXPipeline: Promise<GPUComputePipeline>;
     luminationYPipeline: Promise<GPUComputePipeline>;
-    clampPipeline: Promise<GPUComputePipeline>;
   };
 
   bindGroups: {
     luminationXBindGroup: GPUBindGroup;
     luminationYBindGroup: GPUBindGroup;
-    clampBindGroup: GPUBindGroup;
   };
 
   outputTexture: GPUTexture;
 
   readonly isCompute = true;
+
+  private readonly device: GPUDevice;
+
+  private readonly statsYTexture: GPUTexture;
 
   constructor({
     device,
@@ -28,15 +46,12 @@ export class ClampHighlights implements Anime4KPipeline {
     name = 'clamp highlights',
   }: ClampHighlightsPipelineDescriptor) {
     this.name = name;
+    this.device = device;
+    // Pass-through: stats capture does not alter the frame at the insertion
+    // point, so the chain tail stays on the input texture.
+    this.outputTexture = inputTexture;
 
     // textures
-    this.outputTexture = device.createTexture({
-      label: `${name}: clamp_highlights_texture`,
-      size: [inputTexture.width, inputTexture.height, 1],
-      format: 'rgba16float',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-    });
-
     const statsXTexture = device.createTexture({
       label: `${name}: statsmax_texture`,
       size: [inputTexture.width, inputTexture.height, 1],
@@ -44,12 +59,14 @@ export class ClampHighlights implements Anime4KPipeline {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
     });
 
-    const statsYTexture = device.createTexture({
+    this.statsYTexture = device.createTexture({
       label: `${name}: statsmax_texture`,
       size: [inputTexture.width, inputTexture.height, 1],
       format: 'rgba16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
     });
+
+    const statsYTexture = this.statsYTexture;
 
     // bindGroupLayouts
     const luminationBindGroupLayout = device.createBindGroupLayout({
@@ -71,30 +88,6 @@ export class ClampHighlights implements Anime4KPipeline {
       ],
     });
 
-    const clampBindGroupLayout = device.createBindGroupLayout({
-      label: `${name} clamp bind group layout`,
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: {},
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: {},
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-          },
-        },
-      ],
-    });
-
     // modules
     const luminationXModule = device.createShaderModule({
       label: `${name}: luminationX Module`,
@@ -106,20 +99,10 @@ export class ClampHighlights implements Anime4KPipeline {
       code: luminationYWGSL,
     });
 
-    const clampModule = device.createShaderModule({
-      label: `${name}: clamp Module`,
-      code: clampWGSL,
-    });
-
     // pipeline layouts
     const luminationPipelineLayout = device.createPipelineLayout({
       label: `${name} lumination pipeline layout`,
       bindGroupLayouts: [luminationBindGroupLayout],
-    });
-
-    const clampPipelineLayout = device.createPipelineLayout({
-      label: `${name} clamp pipeline layout`,
-      bindGroupLayouts: [clampBindGroupLayout],
     });
 
     const luminationXPipeline = device.createComputePipelineAsync({
@@ -140,19 +123,9 @@ export class ClampHighlights implements Anime4KPipeline {
       },
     });
 
-    const clampPipeline = device.createComputePipelineAsync({
-      label: `${name} clamp pipeline`,
-      layout: clampPipelineLayout,
-      compute: {
-        module: clampModule,
-        entryPoint: 'computeMain',
-      },
-    });
-
     this.pipelines = {
       luminationXPipeline,
       luminationYPipeline,
-      clampPipeline,
     };
 
     const luminationXBindGroup = device.createBindGroup({
@@ -185,29 +158,9 @@ export class ClampHighlights implements Anime4KPipeline {
       ],
     });
 
-    const clampBindGroup = device.createBindGroup({
-      label: `${name} clamp bind group`,
-      layout: clampBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: inputTexture.createView(),
-        },
-        {
-          binding: 1,
-          resource: statsYTexture.createView(),
-        },
-        {
-          binding: 2,
-          resource: this.outputTexture.createView(),
-        },
-      ],
-    });
-
     this.bindGroups = {
       luminationXBindGroup,
       luminationYBindGroup,
-      clampBindGroup,
     };
   }
 
@@ -231,14 +184,6 @@ export class ClampHighlights implements Anime4KPipeline {
       Math.ceil(this.outputTexture.width / 8),
       Math.ceil(this.outputTexture.height / 8),
     );
-
-    // clamp
-    pass.setPipeline(await this.pipelines.clampPipeline);
-    pass.setBindGroup(0, this.bindGroups.clampBindGroup);
-    pass.dispatchWorkgroups(
-      Math.ceil(this.outputTexture.width / 8),
-      Math.ceil(this.outputTexture.height / 8),
-    );
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
@@ -250,4 +195,24 @@ export class ClampHighlights implements Anime4KPipeline {
   getOutputTexture(): GPUTexture {
     return this.outputTexture;
   }
+
+  /** The 5x5 local-max luma statistics written by this stage. */
+  getStatsTexture(): GPUTexture {
+    return this.statsYTexture;
+  }
+
+  /**
+   * Produce the clamp stage bound to the chain's final texture and this stage's
+   * stats. The chain appends and runs it after every other node.
+   */
+  getDeferredPipeline(finalInputTexture: GPUTexture): Anime4KPipeline {
+    return new ClampHighlightsApply({
+      device: this.device,
+      inputTexture: finalInputTexture,
+      statsTexture: this.statsYTexture,
+      name: this.name,
+    });
+  }
 }
+
+export * from './Apply';
