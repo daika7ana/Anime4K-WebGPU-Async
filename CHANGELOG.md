@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.2.0] - 2026-09-12
+
+### Changed
+
+- `Downscale` now selects a half-phase 4-tap Keys-cubic peaking kernel (`[-0.10, 0.60, 0.60, -0.10]`) with an anti-ringing clamp when the input is exactly `2*out` on both axes: output-Nyquist retention rises from ~0.49 to ~0.70 (measured with the MTF harness) while step overshoot/undershoot stays 0 and the input-Nyquist anti-aliasing null is preserved. The trade-off is a modest increase in energy passed from input periods around 3-6 px. All other ratios keep the ratio-scaled fractional-coverage box. Bindings, entry point, workgroup size and the public API are unchanged.
+
 ## [3.1.0] - 2026-09-12
 
 ### Added

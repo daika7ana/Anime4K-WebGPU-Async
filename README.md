@@ -252,18 +252,27 @@ may be at a different resolution than the final frame, `ClampHighlightsApply` sa
 bilinearly with normalized coordinates. The 5x5 max intentionally includes the center tap, as
 upstream does.
 
-`Downscale` is a compute node implementing a ratio-scaled fractional-coverage box filter: each
-output texel averages the source texels it overlaps, weighted by their fractional coverage on each
-axis. Averaging is performed in linear light (the sRGB-encoded input is decoded, filtered, then
-re-encoded), which avoids the phase-dependent aliasing and shimmer of a single bilinear tap at
-non-integer ratios. Its output no longer needs `RENDER_ATTACHMENT`.
+`Downscale` is a compute node with two ratio-selected paths, both filtering in linear light (the
+sRGB-encoded input is decoded, filtered, then re-encoded) and storing to `rgba16float`:
 
-`Downscale` assumes display-encoded (sRGB) input, matching the renderer's video texture and the
-CNN chain's output; feeding it a linear-light intermediate would average in a distorted space.
-Alpha is averaged and preserved (the video path is opaque); the previous bilinear tap force-cleared
-alpha to 1. Cost scales with the ratio squared per output — roughly 9 source loads per output for
-the auto-downscale ratios in `(1.0, 1.67)` — so extreme direct-use ratios are correct but
-expensive.
+- **Exact integer 2:1** (input exactly `2*out` on both axes): a half-phase 4-tap Keys-cubic peaking
+  kernel with weights `[-0.10, 0.60, 0.60, -0.10]`, plus an anti-ringing clamp to the local tap
+  range. At 2:1 the output sample falls exactly between two source texels, so every interpolating
+  low-pass (box, bilinear, Lanczos) is pinned near 0.5 at output Nyquist; the small in-band peak
+  lifts that band (measured output-Nyquist retention ~0.49 → ~0.70), the clamp keeps step
+  overshoot/undershoot at 0, and the input-Nyquist anti-aliasing null is preserved. The negative
+  lobes also pass modestly more energy from input periods around 3–6 px, a small aliasing increase
+  traded for the restored passband.
+- **Every other ratio**: the ratio-scaled fractional-coverage box — each output texel averages the
+  source texels it overlaps, weighted by their fractional coverage on each axis — which avoids the
+  phase-dependent aliasing and shimmer of a single bilinear tap at non-integer ratios.
+
+Both paths' outputs no longer need `RENDER_ATTACHMENT`. `Downscale` assumes display-encoded (sRGB)
+input, matching the renderer's video texture and the CNN chain's output; feeding it a linear-light
+intermediate would average in a distorted space. Alpha is averaged and preserved (the video path is
+opaque); the previous bilinear tap force-cleared alpha to 1. Cost scales with the ratio squared per
+output — roughly 9 source loads per output for the auto-downscale ratios in `(1.0, 1.67)`, and 16
+per output on the exact-2:1 peaking path — so extreme direct-use ratios are correct but expensive.
 
 ## Performance
 
