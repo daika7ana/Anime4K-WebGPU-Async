@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.3.0] - 2026-10-31
+
+### Added
+
+- `Anime4KPipeline.dispose()` (optional) and a cascading `PipelineChain.dispose()`: frees the textures a node allocated, never its input.
+- `render({ signal })`: aborting stops the loop, disposes the pipelines, destroys the frame texture and the device.
+- `UnsupportedParamError`: `updateParam` throws it for a parameter the pipeline does not own; chains skip only that error.
+- `EffectDescriptor.params`: parameter schema for `DoG.strength` and `BilateralMean.strength`/`strength2`.
+
+### Changed
+
+- `render()` keeps two frames in flight instead of awaiting `onSubmittedWorkDone()` every frame; a slow GPU drops frames instead of stalling.
+- `render()` requests the adapter's `maxTextureDimension2D` and fails with a named error if a pipeline needs more. A throwing frame is skipped, three consecutive failures stop the loop, `device.lost` stops immediately, a failed video load rejects, and a video dimension change stops with a message.
+- `CompiledEffectNode.outputTexture` is deprecated and no longer computed; `profileLabel` stays required for host UIs.
+- `Overlay.isCompute` is `readonly`.
+- The three duplicated CNN pairs share one internal implementation per topology; public classes, options and shaders are unchanged.
+
+### Fixed
+
+- `GANx4UUL` dispatched 48 of its 85 nodes before the nodes producing their inputs (264 bindings read unwritten textures); it now runs in interleaved creation order.
+- Rejected dynamic imports are evicted instead of poisoning the registry, constructor and payload caches; `register()` drops a cached backend.
+- `PipelineChain.append()` now disposes the deferred node it abandons.
+- `PipelineChain.updateParam()` no longer hides invalid parameter values.
+- Harnesses: the auto up/downscale thresholds are pinned by literal expectations, and the packaging check walks the execution graph of all 22 pipeline entry points.
+
+### Removed
+
+- `ClampHighlights.getStatsTexture()` (no caller; **breaking**).
+- `examples/react-webgpu.tsx`, which duplicated `render()` inline; `examples/react-renderer.tsx` is the supported example.
+
 ## [3.2.0] - 2026-09-12
 
 ### Changed

@@ -1,4 +1,5 @@
 import { Anime4KPipeline, OriginalPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 
 /**
  * Original pipeline
@@ -18,7 +19,7 @@ export class Original implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {

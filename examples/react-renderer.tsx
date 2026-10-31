@@ -23,11 +23,12 @@ export const ReactRenderer: React.FC = () => {
     const registry = createBackendRegistry();
     registry.register(createAnime4kBackend());
 
-    let cancelled = false;
+    const controller = new AbortController();
     async function init() {
       await render({
         video,
         canvas,
+        signal: controller.signal,
         // The engine composer builds a preset chain. render() awaits the
         // builder, so fromPreset()'s Promise can be returned directly.
         pipelineBuilder: (device, inputTexture) =>
@@ -42,7 +43,7 @@ export const ReactRenderer: React.FC = () => {
             targetDimensions: { width: canvas.width, height: canvas.height },
           }),
       });
-      if (!cancelled) {
+      if (!controller.signal.aborted) {
         await video.play().catch(() => {
           // Autoplay may be blocked; `<video controls>` lets the user start it.
         });
@@ -51,7 +52,7 @@ export const ReactRenderer: React.FC = () => {
     void init();
 
     return () => {
-      cancelled = true;
+      controller.abort();
       video.pause();
     };
   }, []);

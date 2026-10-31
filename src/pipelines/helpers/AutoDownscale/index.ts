@@ -1,4 +1,5 @@
 import { Anime4KPipeline, Anime4KPipelineDescriptor, Dimensions } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import { Downscale } from '../Downscale';
 
 export const AUTO_DOWNSCALE_THRESHOLDS = {
@@ -154,7 +155,7 @@ export class AutoDownscale implements Anime4KPipeline {
       downscale.updateParam(param, value);
       return;
     }
-    throw new Error('AutoDownscale has no param');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
@@ -172,5 +173,9 @@ export class AutoDownscale implements Anime4KPipeline {
   getExecutionOrder(): readonly Anime4KPipeline[] {
     const downscale = this.ensureDownscale();
     return downscale ? [downscale] : [];
+  }
+
+  dispose(): void {
+    this.downscale?.dispose();
   }
 }

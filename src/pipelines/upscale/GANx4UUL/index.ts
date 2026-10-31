@@ -84,20 +84,21 @@ import overlayConv1ups5WGSL from './shaders/overlayConv1ups5.wgsl';
 import output from './shaders/output.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import { Conv2d, Overlay } from '../../helpers';
 import { recordPipelineList } from '../../recordPipelineList';
 
 export class GANx4UUL implements Anime4KPipeline {
   /**
-   * [0-5] conv2d_tf - conv2d_tf5
-   * [6-11] conv2d_3_tf - conv2d_3_tf5
-   * [12-17] conv2d_6_tf - conv2d_6_tf5
-   * [18-23] conv2d_9_tf - conv2d_9_tf5
-   * [24-29] conv2d_12_tf - conv2d_12_tf5
-   * [30-35] conv2d_15_tf - conv2d_15_tf5
-   * [36-41] conv2d_18_tf - conv2d_18_tf5
-   * [42-47] conv2d_21_tf - conv2d_21_tf5
-   * [48-53] conv2d_24_tf - conv2d_24_tf5
+   * [0-5] conv2d_tf_0 - conv2d_tf_5
+   * [6-11] conv2d_3_tf0 - conv2d_3_tf5
+   * [12-17] conv2d_6_tf0 - conv2d_6_tf5
+   * [18-23] conv2d_9_tf0 - conv2d_9_tf5
+   * [24-29] conv2d_12_tf0 - conv2d_12_tf5
+   * [30-35] conv2d_15_tf0 - conv2d_15_tf5
+   * [36-41] conv2d_18_tf0 - conv2d_18_tf5
+   * [42-47] conv2d_21_tf0 - conv2d_21_tf5
+   * [48-53] conv2d_24_tf0 - conv2d_24_tf5
    */
   pipelines6: Anime4KPipeline[] = [];
 
@@ -123,10 +124,18 @@ export class GANx4UUL implements Anime4KPipeline {
   pipelines: Anime4KPipeline[] = [];
 
   /**
-   * [0-5] conv0ups - conv0ups5
-   * [6-11] overlayConv1ups - overlayConv1ups5
+   * [0-5] conv0ups0 - conv0ups5
+   * [6-11] overlay_conv1ups0 - overlay_conv1ups5
+   * [12] output
+   * [13] overlay (unnamed)
    */
   pipelinesUps: Anime4KPipeline[] = [];
+
+  /**
+   * Nodes in creation order. `pipelines6` and `pipelines` are interleaved: every pair of
+   * `pipelines` nodes reads the `pipelines6` block created just before it.
+   */
+  private readonly executionOrder: Anime4KPipeline[] = [];
 
   /**
    * Creates an instance of GANx4UUL.
@@ -231,7 +240,8 @@ export class GANx4UUL implements Anime4KPipeline {
 
     let len = this.pipelines6.length;
     for (let i = 0; i < 6; i += 1) {
-      this.pipelines6.push(
+      this.add(
+        this.pipelines6,
         new Conv2d({
           device,
           inputTextures: [inputTexture],
@@ -246,7 +256,8 @@ export class GANx4UUL implements Anime4KPipeline {
       outputTextures.length = 0;
       this.fillOutputTexturesFromPipeline6(outputTextures, len, 6);
       for (let j = 0; j < 2; j += 1) {
-        this.pipelines.push(
+        this.add(
+          this.pipelines,
           new Conv2d({
             device,
             inputTextures: outputTextures,
@@ -259,7 +270,8 @@ export class GANx4UUL implements Anime4KPipeline {
       this.addOutputTexturesFromPipeline(outputTextures);
       len = this.pipelines6.length;
       for (let j = 0; j < 6; j += 1) {
-        this.pipelines6.push(
+        this.add(
+          this.pipelines6,
           new Conv2d({
             device,
             inputTextures: outputTextures,
@@ -272,7 +284,8 @@ export class GANx4UUL implements Anime4KPipeline {
 
     outputTextures.length = 0;
     this.fillOutputTexturesFromPipeline6(outputTextures, 48, 6);
-    this.pipelines.push(
+    this.add(
+      this.pipelines,
       new Conv2d({
         device,
         inputTextures: outputTextures,
@@ -290,7 +303,8 @@ export class GANx4UUL implements Anime4KPipeline {
     outputTextures.push(this.pipelines[this.pipelines.length - 1].getOutputTexture());
 
     for (let i = 0; i < 6; i += 1) {
-      this.pipelinesUps.push(
+      this.add(
+        this.pipelinesUps,
         new Conv2d({
           device,
           inputTextures: outputTextures,
@@ -306,7 +320,8 @@ export class GANx4UUL implements Anime4KPipeline {
     }
 
     for (let i = 0; i < 6; i += 1) {
-      this.pipelinesUps.push(
+      this.add(
+        this.pipelinesUps,
         new Overlay({
           device,
           inputTextures: outputTextures,
@@ -321,7 +336,8 @@ export class GANx4UUL implements Anime4KPipeline {
     for (let i = 6; i < this.pipelinesUps.length; i += 1) {
       outputTextures.push(this.pipelinesUps[i].getOutputTexture());
     }
-    this.pipelinesUps.push(
+    this.add(
+      this.pipelinesUps,
       new Conv2d({
         device,
         inputTextures: outputTextures,
@@ -329,7 +345,8 @@ export class GANx4UUL implements Anime4KPipeline {
         name: 'output',
       }),
     );
-    this.pipelinesUps.push(
+    this.add(
+      this.pipelinesUps,
       new Overlay({
         device,
         inputTextures: [
@@ -339,6 +356,12 @@ export class GANx4UUL implements Anime4KPipeline {
         outputTextureSize: [4 * inputTexture.width, 4 * inputTexture.height],
       }),
     );
+  }
+
+  // Every node joins `executionOrder` at creation time; that order is what the GPU must see.
+  private add(list: Anime4KPipeline[], node: Anime4KPipeline) {
+    list.push(node);
+    this.executionOrder.push(node);
   }
 
   private fillOutputTexturesFromPipeline6(
@@ -362,12 +385,14 @@ export class GANx4UUL implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   getExecutionOrder(): readonly Anime4KPipeline[] {
-    // Original execution order: pipelines6, then pipelines, then pipelinesUps.
-    return [...this.pipelines6, ...this.pipelines, ...this.pipelinesUps];
+    // Creation order is interleaved (p6[0..5], p[0], p[1], p6[6..11], p[2], p[3], …, p[16],
+    // then the upscale chain), because each `pipelines` node reads the `pipelines6` block
+    // created immediately before it.
+    return this.executionOrder;
   }
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
@@ -376,5 +401,10 @@ export class GANx4UUL implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.pipelinesUps[this.pipelinesUps.length - 1].getOutputTexture();
+  }
+
+  /** Every node appears exactly once in the interleaved creation order. */
+  dispose(): void {
+    for (const node of this.executionOrder) node.dispose?.();
   }
 }

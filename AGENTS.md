@@ -17,8 +17,8 @@ pnpm run lint                     # eslint . (flat config: eslint.config.mjs)
 pnpm run format                   # prettier --write . (Prettier owns formatting)
 pnpm run format:check             # prettier --check . (also runs inside verify)
 pnpm exec tsc --noEmit            # type-check src/ under TypeScript 6
-pnpm run check:preset-parity      # preset-parity check
-pnpm run check:packaging          # package `exports` / field checks
+pnpm run check:preset-parity      # legacy ModeA..ModeCA vs ComposedPipeline.fromPreset parity
+pnpm run check:packaging          # exports self-ref + packaging + WGSL/dist integrity
 ```
 
 - Package manager is **pnpm 11** (`packageManager`; `pnpm-lock.yaml` is the only lockfile).
@@ -37,8 +37,15 @@ pnpm run check:packaging          # package `exports` / field checks
   `dist/engines/anime4k/catalog.d.ts`).
   Build requires Node `^20.19.0 || >=22.12.0`. **`dist/` is gitignored build output — never edit
   or commit it**; `main`/`types` point there, so it only exists after a build.
-- `verify` chains build, `check:preset-parity`, `check:packaging`, `lint` and `format:check`. Run
-  it (or the individual `check:*` scripts) after packaging / entry-point changes.
+- `verify` chains build, `check:preset-parity`, `check:packaging`, `lint` and `format:check` — it
+  does **not** run `tsc`, so run `pnpm exec tsc --noEmit` too for a real type-check. Both
+  `check:*` scripts `import()` the built `dist/**` graph, so **build first**. Re-run
+  `check:preset-parity` after touching presets, the composer, or auto up/downscale logic
+  (it compares construction traces, execution order, output dims and pass/dispatch traces across
+  a ratio matrix). Re-run `check:packaging` after shader, `exports`, or entry-point changes (it
+  asserts `exports` self-reference, `sideEffects`/no nested `dist/package.json`, catalog effects
+  compiling through the lazy loaders, WGSL↔dist shader parity, `.js`-suffixed specifiers, and no
+  `__awaiter` in `dist`).
 - `scripts/` now contains only the parity/packaging harnesses (`check-preset-parity.cjs`,
   `check-packaging.cjs`), written as `.cjs` because the package is `"type": "module"`. Both
   `scripts/` and `vite.config.ts` are ESLint-ignored.
@@ -88,9 +95,19 @@ pnpm run check:packaging          # package `exports` / field checks
   `declare module '*.wgsl'` in `src/type.d.ts`. Vite/Rolldown emits each as a
   `dist/**/*.wgsl.js` text module via `build.rolldownOptions.moduleTypes` (no bundler loader).
 - Presets (`ModeA`…`ModeCA`) extend `PresetPipeline extends PipelineChain` and declare node
-  order with `addNode` / `addUpscaleX2IfNeeded` / `addAutoDownscale`. Preset `updateParam`
-  forwards to all children and swallows per-child "no param" errors (2.1.0 behavior change — it
-  no longer throws).
+  order with `addNode` / `addUpscaleX2IfNeeded` / `addAutoDownscale`. `PipelineChain.add()` /
+  `append()` advance the chain tail (threading intermediate textures) and register deferrals —
+  construct nodes through them, never by binding the original input texture directly. `updateParam`
+  is inherited from `PipelineChain`: it forwards to every child, skips a child that throws
+  `UnsupportedParamError` (it does not own the param), and rethrows any other error.
+- `dispose()` is optional on `Anime4KPipeline`: a node destroys the textures it allocated and never
+  its input. `PipelineChain.dispose()` cascades; `render()` calls it when its `AbortSignal` aborts.
+- Two-stage effects use the optional `getDeferredPipeline` capability (`src/pipelines/interfaces.ts`):
+  `PipelineChain.append()` registers it and runs the returned node once **after the last node**,
+  threading the chain tail; `getExecutionOrder()` appends it last. `ClampHighlights` is the
+  exemplar: its class is a stats-only pass-through (`getOutputTexture()` aliases the input) and
+  `ClampHighlightsApply` is the deferred clamp at final resolution. Preserve this split — including
+  the 5×5 local-max that intentionally includes the center tap — when touching chains.
 - Auto up/downscale heuristics: `src/pipelines/helpers/AutoDownscale/index.ts`.
   `planAutoDownscale` deliberately returns `null` for target/native ratios in **[2.0x, 2.4x]**;
   this mirrors upstream preset behavior and must not be "fixed".
@@ -107,10 +124,15 @@ pnpm run check:packaging          # package `exports` / field checks
   contract/registry, the engine composer (`ComposedPipeline`), and the Anime4K
   backend/catalog/preset data. Engines are a separate ESM subpath entry (`./engines`,
   `./engines/anime4k`, `./engines/anime4k/catalog`) and are also root-exported for convenience.
-  `src/engines/anime4k/catalog.ts` must stay in sync with the consuming extension's
-  `AVAILABLE_EFFECTS` (`id`/`name`/`category`/`scale`).
+  `src/engines/anime4k/catalog.ts` mirrors the (external) consuming extension's
+  `AVAILABLE_EFFECTS` (`id`/`name`/`category`/`dimensionBehavior.scale`); that extension is not in
+  this repo. CAS/Debanding/ColorAdjust are intentionally omitted (extension-owned custom effects).
   `Dimensions` is **deliberately not** re-exported from `src/engines/index.ts` — a second
   star-export would cause a TS2308 ambiguity with the root `Dimensions`. Do not re-add it.
+- `Downscale` (and `AutoDownscale`) assume **display-encoded (sRGB)** input: the shader decodes →
+  filters in linear light → re-encodes, so feeding a linear-light intermediate is wrong. Both are
+  compute nodes writing `rgba16float`; their outputs need only `TEXTURE_BINDING | STORAGE_BINDING`
+  (no `RENDER_ATTACHMENT`). The exact-2:1 path uses a deliberate 4-tap peaking kernel, not a bug.
 - Name mismatch: npm package `anime4k-webgpu-async` vs repo `daika7ana/Anime4K-WebGPU-Async`
   (the v2 UMD global `anime4k-webgpu` was removed in 3.0.0). Public API changes require syncing
   `README.md` and `CHANGELOG.md` (Keep-a-Changelog + SemVer).

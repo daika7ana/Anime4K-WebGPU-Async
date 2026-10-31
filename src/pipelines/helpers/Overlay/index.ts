@@ -1,5 +1,6 @@
 import vertexWGSL from './shaders/vertex.wgsl';
 import { Anime4KPipeline, OverlayPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import overlay2WGSL from './shaders/overlay2.wgsl';
 import overlay2ComputeWGSL from './shaders/overlay2_compute.wgsl';
 
@@ -16,7 +17,8 @@ export class Overlay implements Anime4KPipeline {
 
   name: string;
 
-  isCompute: boolean = false;
+  // Fixed at construction: either the 2-input compute path or the render path.
+  readonly isCompute: boolean = false;
 
   computePipeline: Promise<GPUComputePipeline> | null = null;
 
@@ -200,7 +202,7 @@ export class Overlay implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error(`${this.constructor.name} has no param`);
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
@@ -242,5 +244,9 @@ export class Overlay implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.outputTexture;
+  }
+
+  dispose(): void {
+    this.outputTexture.destroy();
   }
 }

@@ -47,9 +47,13 @@ export type RequiredEngineLimits = Pick<
 >;
 
 export interface EngineCapabilities {
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   requiredFeatures?: readonly GPUFeatureName[];
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   requiredLimits?: Partial<RequiredEngineLimits>;
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   loadsAssets?: boolean;
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   prewarmable?: boolean;
 }
 
@@ -60,6 +64,9 @@ export interface EffectDescriptor {
   name: string;
   category: EffectCategory;
   dimensionBehavior: DimensionBehavior;
+
+  /** Tunable parameters accepted by `updateParam`, keyed by parameter name. */
+  params?: Readonly<Record<string, EffectParamSchema>>;
   paramsSchema?: Readonly<Record<string, EffectParamSchema>>;
   supportsRealtime?: boolean;
   hidden?: boolean;
@@ -96,11 +103,17 @@ export interface CompileEffectContext {
 
 export interface CompiledEffectNode {
   pipeline: Anime4KPipeline;
-  outputTexture: GPUTexture;
   outputDimensions: Dimensions;
+  /**
+   * @deprecated Never read by the library (use `pipeline.getOutputTexture()`).
+   * Kept for external `compileEffect` implementers; do not populate it.
+   */
+  outputTexture?: GPUTexture;
+  /** Short label for the effect instance (the descriptor `key`). Consumed by host UIs. */
   profileLabel: string;
 }
 
+/** @experimental Not consumed by the library yet; may change or disappear. */
 export interface BenchmarkProfile {
   id: string;
   name: string;
@@ -135,6 +148,7 @@ export interface AlgorithmBackend {
    */
   resolvePresetPlan?(modeId: string, tier: PerformanceTier): readonly PresetNode[];
   compileEffect(ref: EffectReference, ctx: CompileEffectContext): Promise<CompiledEffectNode>;
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   getBenchmarkProfiles?(): readonly BenchmarkProfile[];
 }
 
@@ -144,5 +158,6 @@ export interface BackendRegistry {
   getBackendAsync(backendId: string): Promise<AlgorithmBackend>;
   listEffects(opts?: { includeHidden?: boolean }): readonly EffectDescriptor[];
   getDescriptorById(id: string): EffectDescriptor | undefined;
+  /** @experimental Not consumed by the library yet; may change or disappear. */
   getDescriptorByBackendKey(backendId: string, key: string): EffectDescriptor | undefined;
 }

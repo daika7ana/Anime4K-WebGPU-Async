@@ -61,7 +61,6 @@ export function createAnime4kBackend(): AlgorithmBackend {
 
       return {
         pipeline,
-        outputTexture: pipeline.getOutputTexture(),
         outputDimensions: defaultOutputDimensions(descriptor, ctx),
         profileLabel: descriptor.key,
       };

@@ -1,4 +1,5 @@
 import { Anime4KPipeline, ClampHighlightsPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import luminationXWGSL from './shaders/luminationX.wgsl';
 import luminationYWGSL from './shaders/luminationY.wgsl';
 import { ClampHighlightsApply } from './Apply';
@@ -38,6 +39,8 @@ export class ClampHighlights implements Anime4KPipeline {
 
   private readonly device: GPUDevice;
 
+  private readonly statsXTexture: GPUTexture;
+
   private readonly statsYTexture: GPUTexture;
 
   constructor({
@@ -58,6 +61,7 @@ export class ClampHighlights implements Anime4KPipeline {
       format: 'rgba16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
     });
+    this.statsXTexture = statsXTexture;
 
     this.statsYTexture = device.createTexture({
       label: `${name}: statsmax_texture`,
@@ -165,7 +169,7 @@ export class ClampHighlights implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error(`${this.name} has no param.`);
+    throw new UnsupportedParamError(this.name, param);
   }
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
@@ -196,9 +200,10 @@ export class ClampHighlights implements Anime4KPipeline {
     return this.outputTexture;
   }
 
-  /** The 5x5 local-max luma statistics written by this stage. */
-  getStatsTexture(): GPUTexture {
-    return this.statsYTexture;
+  /** Owns both stats textures; the pass-through output is the input. */
+  dispose(): void {
+    this.statsXTexture.destroy();
+    this.statsYTexture.destroy();
   }
 
   /**

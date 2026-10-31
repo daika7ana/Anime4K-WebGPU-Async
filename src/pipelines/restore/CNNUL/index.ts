@@ -25,6 +25,7 @@ import conv2d7tf2WGSL from './shaders/conv2d7tf2.wgsl';
 import output from './shaders/output.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import { Conv2d, Overlay } from '../../helpers';
 import { recordPipelineList } from '../../recordPipelineList';
 
@@ -131,7 +132,7 @@ export class CNNUL implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error(`${this.constructor.name} has no param`);
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   getOutputTexture(): GPUTexture {
@@ -144,5 +145,9 @@ export class CNNUL implements Anime4KPipeline {
 
   async pass(encoder: GPUCommandEncoder): Promise<void> {
     await recordPipelineList(encoder, this.pipelines);
+  }
+
+  dispose(): void {
+    for (const node of this.pipelines) node.dispose?.();
   }
 }

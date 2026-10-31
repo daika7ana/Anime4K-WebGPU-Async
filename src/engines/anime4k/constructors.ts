@@ -52,7 +52,11 @@ export function loadAnime4kConstructor(key: string): Promise<Anime4KEffectConstr
     return Promise.reject(new Error(`[anime4k] No constructor loader for effect "${key}".`));
   }
 
-  const pending = load();
+  const pending = load().catch((error: unknown) => {
+    // Drop failed loads so a retry can succeed instead of re-throwing forever.
+    cache?.delete(key);
+    throw error;
+  });
   cache.set(key, pending);
   return pending;
 }

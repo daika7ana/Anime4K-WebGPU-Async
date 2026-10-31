@@ -93,7 +93,11 @@ export function createEffectBackend<TPayload>(
     const cached = payloadCache.get(cacheKey);
     if (cached) return cached;
     const loader = loaders?.[descriptor.key];
-    const pending = loader ? loader() : Promise.resolve(undefined);
+    const pending = (loader ? loader() : Promise.resolve(undefined)).catch((error: unknown) => {
+      // Drop failed loads so a retry can succeed instead of re-throwing forever.
+      payloadCache.delete(cacheKey);
+      throw error;
+    });
     payloadCache.set(cacheKey, pending);
     return pending;
   };
@@ -115,7 +119,6 @@ export function createEffectBackend<TPayload>(
       const pipeline = await createPipeline(payload, ctx, descriptor, ref);
       return {
         pipeline,
-        outputTexture: pipeline.getOutputTexture(),
         outputDimensions:
           getOutputDimensions?.(descriptor, ctx) ?? defaultOutputDimensions(descriptor, ctx),
         profileLabel: descriptor.key,

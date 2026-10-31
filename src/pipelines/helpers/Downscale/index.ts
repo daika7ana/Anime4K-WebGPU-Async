@@ -1,4 +1,5 @@
 import { Anime4KPipeline, DownscalePipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import downscaleWGSL from './shaders/downscale.wgsl';
 
 export class Downscale implements Anime4KPipeline {
@@ -94,7 +95,7 @@ export class Downscale implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error(`${this.name} has no param`);
+    throw new UnsupportedParamError(this.name, param);
   }
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
@@ -114,5 +115,9 @@ export class Downscale implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.outputTexture;
+  }
+
+  dispose(): void {
+    this.outputTexture.destroy();
   }
 }

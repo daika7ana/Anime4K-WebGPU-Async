@@ -1,4 +1,5 @@
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import luminationWGSL from './shaders/lumination.wgsl';
 import deblurDoGXWGSL from './shaders/deblurDoGX.wgsl';
 import deblurDoGYWGSL from './shaders/deblurDoGY.wgsl';
@@ -359,7 +360,7 @@ export class DoG implements Anime4KPipeline {
 
   updateParam(param: string, value: any): void {
     if (param !== 'strength') {
-      throw new Error(`No param name as ${param}`);
+      throw new UnsupportedParamError(this.constructor.name, param);
     }
     if (typeof value !== 'number') {
       throw new Error('strength must be a number');
@@ -396,5 +397,10 @@ export class DoG implements Anime4KPipeline {
     const computePass = encoder.beginComputePass();
     await this.recordCompute(computePass);
     computePass.end();
+  }
+
+  dispose(): void {
+    for (const texture of this.textures) texture.destroy();
+    this.strengthBuffer.destroy();
   }
 }

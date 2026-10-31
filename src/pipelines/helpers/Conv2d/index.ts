@@ -1,4 +1,5 @@
 import { Anime4KPipeline, Conv2dPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 
 /**
  * Conv2d pipeline
@@ -113,7 +114,7 @@ export class Conv2d implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
@@ -133,5 +134,9 @@ export class Conv2d implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.outputTexture;
+  }
+
+  dispose(): void {
+    this.outputTexture.destroy();
   }
 }

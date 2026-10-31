@@ -16,23 +16,12 @@ import conv2dlasttfWGSL from './shaders/conv2dlasttf.wgsl';
 import conv2dlasttf1WGSL from './shaders/conv2dlasttf1.wgsl';
 import conv2dlasttf2WGSL from './shaders/conv2dlasttf2.wgsl';
 
-import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
-import { Conv2d, DepthToSpace, Overlay } from '../../helpers';
-import { recordPipelineList } from '../../recordPipelineList';
+import { Anime4KPipelineDescriptor } from '../../interfaces';
+import { ConvNetX2 } from '../CNNx2VL/ConvNet';
 
-export class DenoiseCNNx2VL implements Anime4KPipeline {
-  pipelines: Anime4KPipeline[] = [];
-
-  /**
-   * Creates an instance of CNNSoftVL.
-   *
-   * @param {Object} options - The options for the CNNSoftVL pipeline.
-   * @param {GPUDevice} options.device - The GPU device to use for
-   * creating textures and shader modules.
-   * @param {GPUTexture} options.inputTexture - The input texture for the pipeline.
-   */
-  constructor({ device, inputTexture }: Anime4KPipelineDescriptor) {
-    const shaders: string[] = [
+export class DenoiseCNNx2VL extends ConvNetX2 {
+  constructor(options: Anime4KPipelineDescriptor) {
+    super(options, [
       conv2dtfWGSL,
       conv2dtf1WGSL,
       conv2d1tfWGSL,
@@ -50,80 +39,6 @@ export class DenoiseCNNx2VL implements Anime4KPipeline {
       conv2dlasttfWGSL,
       conv2dlasttf1WGSL,
       conv2dlasttf2WGSL,
-    ];
-
-    this.pushPipeline(device, [inputTexture], shaders[0], 'conv2d_tf');
-    this.pushPipeline(device, [inputTexture], shaders[1], 'conv2d_tf_1');
-
-    const inputTextures: GPUTexture[] = [];
-    for (let i = 1; i < 7; i += 1) {
-      inputTextures.length = 0;
-      this.fillOutputTextures(inputTextures, 2 * (i - 1), 2);
-      this.pushPipeline(device, inputTextures, shaders[2 * i], `conv2d_${i}_tf`);
-      this.pushPipeline(device, inputTextures, shaders[2 * i + 1], `conv2d_${i}_tf_1`);
-    }
-
-    inputTextures.length = 0;
-    this.fillOutputTextures(inputTextures, 0, this.pipelines.length);
-
-    const len = shaders.length;
-    for (let i = 0; i < 3; i += 1) {
-      this.pushPipeline(device, inputTextures, shaders[len - 3 + i], `conv2d_last_tf_${i}`);
-    }
-    inputTextures.length = 0;
-    this.fillOutputTextures(inputTextures, this.pipelines.length - 3, 3);
-    this.pipelines.push(
-      new DepthToSpace({
-        device,
-        inputTextures,
-        name: 'DepthToSpace',
-      }),
-    );
-
-    this.pipelines.push(
-      new Overlay({
-        device,
-        inputTextures: [inputTexture, this.getOutputTexture()],
-        outputTextureSize: [2 * inputTexture.width, 2 * inputTexture.height],
-      }),
-    );
-  }
-
-  updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
-  }
-
-  getExecutionOrder(): readonly Anime4KPipeline[] {
-    return this.pipelines;
-  }
-
-  async pass(encoder: GPUCommandEncoder): Promise<void> {
-    await recordPipelineList(encoder, this.pipelines);
-  }
-
-  getOutputTexture(): GPUTexture {
-    return this.pipelines[this.pipelines.length - 1].getOutputTexture();
-  }
-
-  private pushPipeline(
-    device: GPUDevice,
-    inputTexture: GPUTexture[],
-    shaderWGSL: string,
-    name: string,
-  ): void {
-    this.pipelines.push(
-      new Conv2d({
-        device,
-        inputTextures: inputTexture,
-        shaderWGSL,
-        name,
-      }),
-    );
-  }
-
-  private fillOutputTextures(outputTextures: GPUTexture[], from: number, count: number) {
-    for (let i = from; i < from + count; i += 1) {
-      outputTextures.push(this.pipelines[i].getOutputTexture());
-    }
+    ]);
   }
 }

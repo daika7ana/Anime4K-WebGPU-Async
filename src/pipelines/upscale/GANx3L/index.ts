@@ -30,6 +30,7 @@ import overlayConv1ups1WGSL from './shaders/overlayConv1ups1.wgsl';
 import overlayOutputWGSL from './shaders/overlayOutput.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import { Conv2d, Overlay } from '../../helpers';
 import { recordPipelineList } from '../../recordPipelineList';
 
@@ -377,7 +378,7 @@ export class GANx3L implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   getExecutionOrder(): readonly Anime4KPipeline[] {
@@ -390,5 +391,9 @@ export class GANx3L implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.pipelines[this.pipelines.length - 1].getOutputTexture();
+  }
+
+  dispose(): void {
+    for (const node of this.pipelines) node.dispose?.();
   }
 }

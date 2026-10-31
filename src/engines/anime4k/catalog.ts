@@ -29,6 +29,7 @@ function effect(
   category: EffectCategory,
   dimensionBehavior: EffectDescriptor['dimensionBehavior'],
   license?: EffectDescriptor['license'],
+  params?: EffectDescriptor['params'],
 ): EffectDescriptor {
   return {
     id,
@@ -38,6 +39,7 @@ function effect(
     category,
     dimensionBehavior,
     ...(license ? { license } : {}),
+    ...(params ? { params } : {}),
   };
 }
 
@@ -54,7 +56,15 @@ function buildDescriptors(): readonly EffectDescriptor[] {
     ),
 
     // Deblur
-    effect('anime4k/Deblur/DoG', 'DoG', 'Deblur (DoG)', 'deblur', SAME, ANIME4K_LICENSE),
+    effect('anime4k/Deblur/DoG', 'DoG', 'Deblur (DoG)', 'deblur', SAME, ANIME4K_LICENSE, {
+      strength: {
+        type: 'number',
+        min: 0,
+        step: 0.05,
+        defaultValue: 0,
+        labelFallback: 'Strength',
+      },
+    }),
 
     // Denoise
     effect(
@@ -63,6 +73,23 @@ function buildDescriptors(): readonly EffectDescriptor[] {
       'Denoise (Bilateral Mean)',
       'denoise',
       SAME,
+      undefined,
+      {
+        strength: {
+          type: 'number',
+          min: 0,
+          step: 0.05,
+          defaultValue: 0,
+          labelFallback: 'Strength',
+        },
+        strength2: {
+          type: 'number',
+          min: 0,
+          step: 0.05,
+          defaultValue: 0,
+          labelFallback: 'Strength 2',
+        },
+      },
     ),
 
     // Restore

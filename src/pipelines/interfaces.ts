@@ -24,6 +24,12 @@ export interface Anime4KPipeline {
    */
   getOutputTexture(): GPUTexture;
 
+  /**
+   * Release GPU resources owned by this pipeline (never its input texture).
+   * Optional: nodes that alias their input have nothing to release.
+   */
+  dispose?(): void;
+
   /** True when this pipeline contains only compute work and can share a compute pass */
   readonly isCompute?: boolean;
 

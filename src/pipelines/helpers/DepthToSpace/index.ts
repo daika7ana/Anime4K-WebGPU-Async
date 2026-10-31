@@ -1,5 +1,6 @@
 import depthToSpaceWGSL from './shaders/depthToSpace.wgsl';
 import { Anime4KPipeline, DepthToSpacePipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 
 export class DepthToSpace implements Anime4KPipeline {
   outputTexture: GPUTexture;
@@ -117,7 +118,7 @@ export class DepthToSpace implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   async recordCompute(pass: GPUComputePassEncoder): Promise<void> {
@@ -137,5 +138,9 @@ export class DepthToSpace implements Anime4KPipeline {
 
   getOutputTexture(): GPUTexture {
     return this.outputTexture;
+  }
+
+  dispose(): void {
+    this.outputTexture.destroy();
   }
 }

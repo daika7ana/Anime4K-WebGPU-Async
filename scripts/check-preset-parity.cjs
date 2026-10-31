@@ -16,6 +16,12 @@
  *   6. compare the `recordPipelineList` pass/dispatch trace;
  *   7. assert neither side throws on an unknown `updateParam`.
  *
+ * Before the matrix, a literal golden table pins the auto up/downscale
+ * heuristic itself: both sides call the same `planAutoDownscale` /
+ * `shouldUpscaleX2`, so comparing them cannot catch a wrong threshold. The
+ * expected numbers below are hardcoded on purpose and must not be derived from
+ * `AUTO_DOWNSCALE_THRESHOLDS`.
+ *
  * The v3 library is ESM-only, so this harness is `.cjs` and loads the built
  * graph with a dynamic `import()`.
  *
@@ -69,6 +75,8 @@ const REQUIRED_EXPORTS = [
   'ANIME4K_PRESET_MODES',
   'resolveAnime4kPresetRefs',
   'recordPipelineList',
+  'planAutoDownscale',
+  'shouldUpscaleX2',
 ];
 
 let bundle = null;
@@ -412,6 +420,141 @@ function buildMatrix() {
 
 const MATRIX = buildMatrix();
 
+/* -------------------------------------------------------------------------- *
+ * Literal golden expectations for the auto up/downscale heuristic.
+ *
+ * Hardcoded on purpose: both the legacy presets and the composer call the same
+ * `planAutoDownscale` / `shouldUpscaleX2`, so the parity matrix above cannot
+ * notice a wrong threshold. These rows encode the documented behaviour
+ * (strict 1.2x/2.0x/2.4x/4.0x bounds, the deliberate [2.0x, 2.4x] gap, both
+ * axes required) and are checked against the real exported functions.
+ * -------------------------------------------------------------------------- */
+const AUTO_DOWNSCALE_GOLDEN = [
+  {
+    label: 'r=1.4',
+    native: { width: 100, height: 100 },
+    target: { width: 140, height: 140 },
+    plan: { factor: 2, downscaleTo: { width: 140, height: 140 } },
+    upscaleX2: true,
+  },
+  {
+    label: 'r=1.1',
+    native: { width: 100, height: 100 },
+    target: { width: 110, height: 110 },
+    plan: null,
+    upscaleX2: false,
+  },
+  {
+    label: 'r=1.2 (lower boundary)',
+    native: { width: 100, height: 100 },
+    target: { width: 120, height: 120 },
+    plan: null,
+    upscaleX2: false,
+  },
+  {
+    label: 'r=2.0 (gap start)',
+    native: { width: 100, height: 100 },
+    target: { width: 200, height: 200 },
+    plan: null,
+    upscaleX2: true,
+  },
+  {
+    label: 'r=2.4 (gap end)',
+    native: { width: 100, height: 100 },
+    target: { width: 240, height: 240 },
+    plan: null,
+    upscaleX2: true,
+  },
+  {
+    label: 'r=2.5',
+    native: { width: 100, height: 100 },
+    target: { width: 250, height: 250 },
+    plan: { factor: 4, downscaleTo: { width: 125, height: 125 } },
+    upscaleX2: true,
+  },
+  {
+    label: 'r=3.0',
+    native: { width: 100, height: 100 },
+    target: { width: 300, height: 300 },
+    plan: { factor: 4, downscaleTo: { width: 150, height: 150 } },
+    upscaleX2: true,
+  },
+  {
+    label: 'r=3.01 (odd ceil)',
+    native: { width: 100, height: 100 },
+    target: { width: 301, height: 301 },
+    plan: { factor: 4, downscaleTo: { width: 151, height: 151 } },
+    upscaleX2: true,
+  },
+  {
+    label: 'r=4.0 (upper boundary)',
+    native: { width: 100, height: 100 },
+    target: { width: 400, height: 400 },
+    plan: null,
+    upscaleX2: true,
+  },
+  {
+    label: 'wide-only r=1.4 (height must qualify too)',
+    native: { width: 100, height: 300 },
+    target: { width: 140, height: 300 },
+    plan: null,
+    upscaleX2: false,
+  },
+  {
+    label: 'tall-only r=1.4 (width must qualify too)',
+    native: { width: 300, height: 100 },
+    target: { width: 300, height: 140 },
+    plan: null,
+    upscaleX2: false,
+  },
+];
+
+function samePlan(a, b) {
+  if (a === null || b === null) return a === b;
+  return (
+    a.factor === b.factor &&
+    a.downscaleTo.width === b.downscaleTo.width &&
+    a.downscaleTo.height === b.downscaleTo.height
+  );
+}
+
+function formatPlan(plan) {
+  if (plan === null) return 'null';
+  return `factor=${plan.factor} downscaleTo=${plan.downscaleTo.width}x${plan.downscaleTo.height}`;
+}
+
+/** Assert the real heuristic functions against the literal golden table. */
+function checkAutoDownscaleGolden() {
+  const failures = [];
+  AUTO_DOWNSCALE_GOLDEN.forEach((row) => {
+    const cell = `auto-downscale golden ${row.label}`;
+    let plan;
+    let upscaleX2;
+    try {
+      plan = bundle.planAutoDownscale(row.native, row.target);
+      upscaleX2 = bundle.shouldUpscaleX2(row.native, row.target);
+    } catch (err) {
+      failures.push({ cell, check: 'threw', detail: errorText(err) });
+      return;
+    }
+    if (!samePlan(plan, row.plan)) {
+      failures.push({
+        cell,
+        check: 'planAutoDownscale',
+        detail: `expected ${formatPlan(row.plan)} got ${formatPlan(plan)}`,
+      });
+    }
+    if (upscaleX2 !== row.upscaleX2) {
+      failures.push({
+        cell,
+        check: 'shouldUpscaleX2',
+        detail: `expected ${row.upscaleX2} got ${upscaleX2}`,
+      });
+    }
+  });
+  return failures;
+}
+
 function normalizeModes(value) {
   if (Array.isArray(value)) {
     return value
@@ -657,6 +800,15 @@ async function main() {
 
   // Ratio-matrix parity cells.
   const registry = makeRegistry();
+
+  // Literal golden expectations for the shared up/downscale heuristic. These
+  // run first so a wrong threshold is reported on its own, not as a confusing
+  // legacy-vs-composed diff.
+  const goldenFailures = checkAutoDownscaleGolden();
+  for (let f = 0; f < goldenFailures.length; f += 1) {
+    failures.push(goldenFailures[f]);
+  }
+
   for (let m = 0; m < presetModes.length; m += 1) {
     const modeId = presetModes[m];
     const ModeClass = modeClasses[modeId];
@@ -691,6 +843,7 @@ async function main() {
     console.log(
       `PASS: ${cellsRun} cells matched, ` +
         `${Object.keys(EXPECTED_PRESET_REFS).length} preset ref tables matched, ` +
+        `${AUTO_DOWNSCALE_GOLDEN.length} auto-downscale golden expectation(s) matched, ` +
         'unknown mode rejected.',
     );
     process.exitCode = 0;

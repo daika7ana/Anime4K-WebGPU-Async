@@ -15,7 +15,10 @@
  *      the lazy per-effect loader/chunk paths resolve);
  *   4. shader parity: every captured `createShaderModule({ code })` equals the
  *      content of a `src/**\/*.wgsl` source file;
- *   5. specifier integrity over `dist/**\/*.js` and `dist/**\/*.d.ts` (`.js`-
+ *   5. execution-graph order: for every exported pipeline class (leaves,
+ *      presets, composed engine) every texture read through a bind group was
+ *      produced earlier in `getExecutionOrder()` or is the input texture;
+ *   6. specifier integrity over `dist/**\/*.js` and `dist/**\/*.d.ts` (`.js`-
  *      suffixed relative specifiers, `.wgsl.js` shader modules) plus "no
  *      `__awaiter` anywhere in `dist`".
  *
@@ -264,15 +267,25 @@ function checkPackagingInvariants() {
  * 3+4) Catalog compilation and shader parity.
  * -------------------------------------------------------------------------- */
 function makeCompileDevice(captures) {
+  let nextResourceId = 0;
+  const allocResourceId = () => {
+    nextResourceId += 1;
+    return nextResourceId;
+  };
+
   return {
+    /** Shared identity allocator for the mock graph input texture (internal). */
+    __allocResourceId: allocResourceId,
     createTexture(desc = {}) {
       const size = Array.isArray(desc.size) ? desc.size : [0, 0, 1];
+      const resourceId = allocResourceId();
       return {
         label: desc.label,
         width: size[0],
         height: size[1],
+        __resourceId: resourceId,
         createView() {
-          return {};
+          return { __resourceId: resourceId };
         },
       };
     },
@@ -286,14 +299,28 @@ function makeCompileDevice(captures) {
     createRenderPipelineAsync() {
       return Promise.resolve({});
     },
-    createBindGroupLayout() {
-      return {};
+    createBindGroupLayout(desc = {}) {
+      return { __layoutEntries: Array.isArray(desc.entries) ? desc.entries : [] };
     },
     createPipelineLayout() {
       return {};
     },
-    createBindGroup() {
-      return {};
+    createBindGroup(desc = {}) {
+      // Classify each binding from the layout: a `storageTexture` entry is a
+      // write, a `texture` entry is a read. Samplers carry no texture identity.
+      const layoutEntries =
+        desc.layout && Array.isArray(desc.layout.__layoutEntries)
+          ? desc.layout.__layoutEntries
+          : [];
+      const record = { label: desc.label, reads: [], writes: [] };
+      (Array.isArray(desc.entries) ? desc.entries : []).forEach((entry) => {
+        const resource = entry && entry.resource;
+        if (!resource || resource.__resourceId === undefined) return;
+        const layoutEntry = layoutEntries.find((candidate) => candidate.binding === entry.binding);
+        if (layoutEntry && layoutEntry.storageTexture) record.writes.push(resource.__resourceId);
+        else record.reads.push(resource.__resourceId);
+      });
+      return { __bindResources: record };
     },
     createSampler() {
       return {};
@@ -463,6 +490,248 @@ function checkShaderParity() {
 }
 
 /* -------------------------------------------------------------------------- *
+ * 4b) Pipeline execution-graph order.
+ *
+ * Every pipeline class (leaf effects, presets, and the composed engine) is
+ * built against the mock device above, flattened through `getExecutionOrder()`,
+ * and walked in execution order. Every texture a node *reads* (a bind-group
+ * entry whose layout slot is a `texture`, not a `storageTexture`) must already
+ * have been produced by an earlier node or be the original input texture.
+ * This is the check that catches nodes bound to a texture from a later stage
+ * (the GANx4UUL ordering bug) which construction/dimension traces cannot see.
+ * -------------------------------------------------------------------------- */
+const GRAPH_INPUT_DIMENSIONS = { width: 64, height: 64 };
+// 3.125x target: exercises both the x2 insertion and the x4 auto-downscale path.
+const GRAPH_TARGET_DIMENSIONS = { width: 200, height: 200 };
+
+const GRAPH_PIPELINES = [
+  { label: 'restore/CNNM', kind: 'leaf', category: 'restore', file: 'CNNM', ctor: 'CNNM' },
+  {
+    label: 'restore/CNNSoftM',
+    kind: 'leaf',
+    category: 'restore',
+    file: 'CNNSoftM',
+    ctor: 'CNNSoftM',
+  },
+  { label: 'restore/CNNVL', kind: 'leaf', category: 'restore', file: 'CNNVL', ctor: 'CNNVL' },
+  {
+    label: 'restore/CNNSoftVL',
+    kind: 'leaf',
+    category: 'restore',
+    file: 'CNNSoftVL',
+    ctor: 'CNNSoftVL',
+  },
+  { label: 'restore/CNNUL', kind: 'leaf', category: 'restore', file: 'CNNUL', ctor: 'CNNUL' },
+  { label: 'restore/GANUUL', kind: 'leaf', category: 'restore', file: 'GANUUL', ctor: 'GANUUL' },
+  { label: 'upscale/CNNx2M', kind: 'leaf', category: 'upscale', file: 'CNNx2M', ctor: 'CNNx2M' },
+  { label: 'upscale/CNNx2VL', kind: 'leaf', category: 'upscale', file: 'CNNx2VL', ctor: 'CNNx2VL' },
+  {
+    label: 'upscale/DenoiseCNNx2VL',
+    kind: 'leaf',
+    category: 'upscale',
+    file: 'DenoiseCNNx2VL',
+    ctor: 'DenoiseCNNx2VL',
+  },
+  { label: 'upscale/CNNx2UL', kind: 'leaf', category: 'upscale', file: 'CNNx2UL', ctor: 'CNNx2UL' },
+  { label: 'upscale/GANx3L', kind: 'leaf', category: 'upscale', file: 'GANx3L', ctor: 'GANx3L' },
+  {
+    label: 'upscale/GANx4UUL',
+    kind: 'leaf',
+    category: 'upscale',
+    file: 'GANx4UUL',
+    ctor: 'GANx4UUL',
+  },
+  {
+    label: 'denoise/BilateralMean',
+    kind: 'leaf',
+    category: 'denoise',
+    file: 'BilateralMean',
+    ctor: 'BilateralMean',
+  },
+  { label: 'deblur/DoG', kind: 'leaf', category: 'deblur', file: 'DoG', ctor: 'DoG' },
+  { label: 'ModeA', kind: 'preset', file: 'ModeA', ctor: 'ModeA' },
+  { label: 'ModeAA', kind: 'preset', file: 'ModeAA', ctor: 'ModeAA' },
+  { label: 'ModeB', kind: 'preset', file: 'ModeB', ctor: 'ModeB' },
+  { label: 'ModeBB', kind: 'preset', file: 'ModeBB', ctor: 'ModeBB' },
+  { label: 'ModeC', kind: 'preset', file: 'ModeC', ctor: 'ModeC' },
+  { label: 'ModeCA', kind: 'preset', file: 'ModeCA', ctor: 'ModeCA' },
+  { label: 'ComposedPipeline.fromPreset(A)', kind: 'composed', modeId: 'A' },
+  { label: 'ComposedPipeline.fromPreset(C)', kind: 'composed', modeId: 'C' },
+];
+
+function distModule(...segments) {
+  return import(pathToUrl(path.join(ROOT, 'dist', ...segments)));
+}
+
+async function buildGraphPipeline(entry, device, inputTexture) {
+  if (entry.kind === 'composed') {
+    const root = await distModule('index.js');
+    const registry = root.createBackendRegistry();
+    registry.register(root.createAnime4kBackend());
+    return root.ComposedPipeline.fromPreset({
+      device,
+      inputTexture,
+      nativeDimensions: { ...GRAPH_INPUT_DIMENSIONS },
+      targetDimensions: { ...GRAPH_TARGET_DIMENSIONS },
+      registry,
+      backendId: 'anime4k',
+      modeId: entry.modeId,
+      tier: 'balanced',
+    });
+  }
+
+  const directory =
+    entry.kind === 'preset'
+      ? ['pipelines', 'presets', entry.file]
+      : ['pipelines', entry.category, entry.file];
+  const mod = await distModule(...directory, 'index.js');
+  const Ctor = mod[entry.ctor];
+  if (typeof Ctor !== 'function') {
+    throw new Error(`dist/${directory.join('/')}/index.js has no "${entry.ctor}" export`);
+  }
+  const options = { device, inputTexture };
+  if (entry.kind === 'preset') {
+    options.nativeDimensions = { ...GRAPH_INPUT_DIMENSIONS };
+    options.targetDimensions = { ...GRAPH_TARGET_DIMENSIONS };
+  }
+  return new Ctor(options);
+}
+
+function flattenGraphNodes(node, out = []) {
+  if (typeof node.getExecutionOrder === 'function') {
+    const order = node.getExecutionOrder() || [];
+    for (let i = 0; i < order.length; i += 1) flattenGraphNodes(order[i], out);
+  } else {
+    out.push(node);
+  }
+  return out;
+}
+
+/**
+ * Bind-group records owned by a node. The mock `createBindGroup` returns a
+ * property bag, so the records are discovered by walking the node's own
+ * properties (e.g. `bindGroup`, `bindGroups.downscaleBindGroup`). Depth 2 is
+ * enough for one nesting level; `device` is skipped so the mock is not walked.
+ */
+function collectBindGroupRecords(node) {
+  const records = [];
+  const seen = new WeakSet();
+  const visit = (value, depth) => {
+    if (!value || typeof value !== 'object' || depth > 2 || seen.has(value)) return;
+    seen.add(value);
+    if (value.__bindResources) {
+      records.push(value.__bindResources);
+      return;
+    }
+    Object.keys(value).forEach((key) => {
+      if (key === 'device') return;
+      visit(value[key], depth + 1);
+    });
+  };
+  visit(node, 0);
+  return records;
+}
+
+function nodeLabel(node) {
+  return (
+    (node && node.name) || (node && node.constructor && node.constructor.name) || '<anonymous>'
+  );
+}
+
+/** Walk one pipeline in execution order; return graph violations. */
+function inspectPipelineGraph(pipeline, inputTexture) {
+  const nodes = flattenGraphNodes(pipeline);
+  const produced = new Set([inputTexture.__resourceId]);
+  const offending = [];
+  let bindingCount = 0;
+  let missingCount = 0;
+
+  nodes.forEach((node) => {
+    const missing = [];
+    collectBindGroupRecords(node).forEach((record) => {
+      record.reads.forEach((resourceId) => {
+        bindingCount += 1;
+        if (!produced.has(resourceId)) {
+          missingCount += 1;
+          missing.push({ group: record.label, resourceId });
+        }
+      });
+      record.writes.forEach((resourceId) => produced.add(resourceId));
+    });
+    if (missing.length > 0) offending.push({ node: nodeLabel(node), missing });
+    const output = typeof node.getOutputTexture === 'function' ? node.getOutputTexture() : null;
+    if (output && output.__resourceId !== undefined) produced.add(output.__resourceId);
+  });
+
+  return { nodeCount: nodes.length, bindingCount, missingCount, offending };
+}
+
+async function checkPipelineGraphOrder() {
+  let pipelinesChecked = 0;
+  let nodesChecked = 0;
+  let bindingsChecked = 0;
+
+  for (let i = 0; i < GRAPH_PIPELINES.length; i += 1) {
+    const entry = GRAPH_PIPELINES[i];
+    const device = makeCompileDevice([]);
+    const inputTexture = {
+      label: 'input texture',
+      width: GRAPH_INPUT_DIMENSIONS.width,
+      height: GRAPH_INPUT_DIMENSIONS.height,
+      __resourceId: device.__allocResourceId(),
+      createView() {
+        return { __resourceId: inputTexture.__resourceId };
+      },
+    };
+
+    let pipeline;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      pipeline = await buildGraphPipeline(entry, device, inputTexture);
+    } catch (err) {
+      fail('pipeline graph order', `${entry.label}: construction threw: ${errorText(err)}`);
+      continue;
+    }
+
+    try {
+      const result = inspectPipelineGraph(pipeline, inputTexture);
+      pipelinesChecked += 1;
+      nodesChecked += result.nodeCount;
+      bindingsChecked += result.bindingCount;
+
+      if (result.bindingCount === 0) {
+        fail(
+          'pipeline graph order',
+          `${entry.label}: captured no texture bindings (mock attribution is broken?)`,
+        );
+      }
+      if (result.missingCount === 0) continue;
+
+      const details = result.offending.slice(0, 5).map((offence) => {
+        const first = offence.missing
+          .slice(0, 3)
+          .map((item) => `${item.group} -> texture #${item.resourceId}`)
+          .join('; ');
+        return `node "${offence.node}" reads ${offence.missing.length} unwritten binding(s): ${first}`;
+      });
+      const extra = result.offending.length > details.length ? ' ...' : '';
+      fail(
+        'pipeline graph order',
+        `${entry.label}: ${result.offending.length} node(s) read ${result.missingCount} ` +
+          `texture binding(s) not produced earlier\n${details.join('\n')}${extra}`,
+      );
+    } catch (err) {
+      fail('pipeline graph order', `${entry.label}: graph walk threw: ${errorText(err)}`);
+    }
+  }
+
+  console.log(
+    `  pipeline graph order: ${pipelinesChecked}/${GRAPH_PIPELINES.length} pipeline(s), ` +
+      `${nodesChecked} node(s), ${bindingsChecked} read binding(s) checked`,
+  );
+}
+
+/* -------------------------------------------------------------------------- *
  * 5) Specifier integrity + no __awaiter.
  * -------------------------------------------------------------------------- */
 function extractSpecifiers(source) {
@@ -559,6 +828,7 @@ async function main() {
       },
     ],
     ['catalog compilation', checkCatalogCompilation],
+    ['pipeline graph order', checkPipelineGraphOrder],
     [
       'shader parity',
       () => {

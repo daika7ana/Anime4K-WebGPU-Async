@@ -1,4 +1,5 @@
 export * from './interfaces';
+export * from './errors';
 export * from './PipelineChain';
 export * from './recordPipelineList';
 export * from './deblur';

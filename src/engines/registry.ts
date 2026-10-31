@@ -25,6 +25,8 @@ export function createBackendRegistry(): BackendRegistry {
   return {
     register(backend, opts) {
       backends.set(backend.backendId, backend);
+      // A re-registered backend must be reloaded, not served from the old promise.
+      asyncCache.delete(backend.backendId);
       if (opts?.lazy) {
         lazyLoaders.set(backend.backendId, opts.lazy);
       }
@@ -48,11 +50,17 @@ export function createBackendRegistry(): BackendRegistry {
         return Promise.resolve(existing);
       }
 
-      const pending = loader().then((resolved) => {
-        backends.set(backendId, resolved);
-        indexDescriptors(resolved);
-        return resolved;
-      });
+      const pending = loader()
+        .then((resolved) => {
+          backends.set(backendId, resolved);
+          indexDescriptors(resolved);
+          return resolved;
+        })
+        .catch((error: unknown) => {
+          // Never memoize a failure: one bad import would poison the cache for good.
+          asyncCache.delete(backendId);
+          throw error;
+        });
       asyncCache.set(backendId, pending);
       return pending;
     },
@@ -76,6 +84,7 @@ export function createBackendRegistry(): BackendRegistry {
       return descriptorsById.get(id);
     },
 
+    /** @experimental Not consumed by the library yet; may change or disappear. */
     getDescriptorByBackendKey(backendId, key) {
       return descriptorsByBackendKey.get(`${backendId}:${key}`);
     },

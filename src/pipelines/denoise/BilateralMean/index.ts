@@ -1,4 +1,5 @@
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import denoiseBilateralMeanWGSL from './shaders/bilateralMean.wgsl';
 
 export class BilateralMean implements Anime4KPipeline {
@@ -151,7 +152,7 @@ export class BilateralMean implements Anime4KPipeline {
 
   updateParam(param: string, value): void {
     if (param !== 'strength' && param !== 'strength2') {
-      throw new Error(`No param name as ${param}`);
+      throw new UnsupportedParamError(this.constructor.name, param);
     }
     if (typeof value !== 'number') {
       throw new Error('strength must be a number');
@@ -164,5 +165,11 @@ export class BilateralMean implements Anime4KPipeline {
     } else if (param === 'strength2') {
       this.device.queue.writeBuffer(this.strengthBuffer2, 0, new Float32Array([value]));
     }
+  }
+
+  dispose(): void {
+    this.texture.destroy();
+    this.strengthBuffer.destroy();
+    this.strengthBuffer2.destroy();
   }
 }

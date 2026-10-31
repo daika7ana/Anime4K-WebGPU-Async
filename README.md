@@ -127,9 +127,24 @@ await render({
 });
 ```
 
+Pass an `AbortSignal` to own the lifetime of the loop:
+
+```typescript
+const controller = new AbortController();
+await render({ video, canvas, pipelineBuilder, signal: controller.signal });
+
+// later: stops the loop, disposes the pipelines, destroys the device
+controller.abort();
+```
+
+`render()` requests the adapter's maximum `maxTextureDimension2D` and throws a named error if a
+pipeline allocates a texture beyond it (`GANx4UUL` at 4x is the common case). A frame that throws is
+skipped and rendering continues; three consecutive failures stop the loop, as do `device.lost` and a
+change of the video's intrinsic size (call `render()` again with the new size). Without a signal the
+loop runs until the video element is garbage-collected, so long-lived pages should pass one.
+
 See [`examples/react-renderer.tsx`](./examples/react-renderer.tsx) for a React example that
-builds a preset through the engine composer (`ComposedPipeline.fromPreset`), and
-[`examples/react-webgpu.tsx`](./examples/react-webgpu.tsx) for a manual, raw-WebGPU integration.
+builds a preset through the engine composer (`ComposedPipeline.fromPreset`).
 
 For a [preset mode](https://github.com/bloc97/Anime4K/blob/master/md/GLSL_Instructions_Advanced.md),
 pass the native and target resolutions so the correct chain is assembled automatically:
@@ -164,13 +179,21 @@ const output = pipeline.getOutputTexture(); // bind this instead of inputTexture
 
 // adjust a supported parameter (e.g. deblur strength)
 pipeline.updateParam('strength', 3.0);
+
+// release the textures this pipeline allocated (its input texture is not touched)
+pipeline.dispose();
 ```
 
 `inputTexture` must have usage `TEXTURE_BINDING`. Output texture usage depends on the pipeline:
 render-based helpers (e.g. `Overlay`) expose
 `TEXTURE_BINDING | RENDER_ATTACHMENT | STORAGE_BINDING`, while compute-based helpers (e.g.
 `Conv2d`, `ClampHighlights`, `Downscale`) only need `TEXTURE_BINDING | STORAGE_BINDING`. Pipelines
-can be chained in tandem for more sophisticated effects.
+can be chained in tandem for more sophisticated effects. `chain.dispose()` releases the textures of
+every node, including a deferred `ClampHighlightsApply`.
+
+`updateParam` throws `UnsupportedParamError` for a parameter the pipeline does not own. On a chain
+that error is skipped per child, while any other error (an invalid value, for example) is rethrown —
+so `chain.updateParam('strength', -1)` fails loudly instead of silently doing nothing.
 
 ### 3. Engine-backed composition
 

@@ -1,4 +1,5 @@
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from './interfaces';
+import { UnsupportedParamError } from './errors';
 import { recordPipelineList } from './recordPipelineList';
 
 export interface PipelineChainDescriptor {
@@ -62,6 +63,10 @@ export class PipelineChain implements Anime4KPipeline {
       this.deferredFactories.push((tail) => defer(tail));
       // A new factory may change the epilogue even when the tail reference is
       // unchanged (e.g. two consecutive pass-through stages), so drop the memo.
+      // The old epilogue nodes own full-resolution textures; release them.
+      if (this.resolvedDeferred) {
+        for (const node of this.resolvedDeferred) node.dispose?.();
+      }
       this.resolvedDeferred = null;
       this.resolvedDeferredTail = null;
     }
@@ -129,9 +134,20 @@ export class PipelineChain implements Anime4KPipeline {
     for (let i = 0; i < order.length; i += 1) {
       try {
         order[i].updateParam(param, value);
-      } catch {
-        // Children without the requested parameter throw; keep forwarding.
+      } catch (error) {
+        // Children without the requested parameter throw UnsupportedParamError;
+        // keep forwarding. Invalid values must still surface.
+        if (!(error instanceof UnsupportedParamError)) throw error;
       }
     }
+  }
+
+  dispose(): void {
+    // Don't call getExecutionOrder(): it would materialize an unbuilt epilogue
+    // just to destroy it.
+    const nodes = this.resolvedDeferred
+      ? [...this.pipelines, ...this.resolvedDeferred]
+      : this.pipelines;
+    for (const node of nodes) node.dispose?.();
   }
 }

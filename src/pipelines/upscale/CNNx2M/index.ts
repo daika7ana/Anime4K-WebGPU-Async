@@ -8,6 +8,7 @@ import conv2d6tfWGSL from './shaders/conv2d6tf.wgsl';
 import conv2dlasttfWGSL from './shaders/conv2dlasttf.wgsl';
 
 import { Anime4KPipeline, Anime4KPipelineDescriptor } from '../../interfaces';
+import { UnsupportedParamError } from '../../errors';
 import { Conv2d, DepthToSpace, Overlay } from '../../helpers';
 import { recordPipelineList } from '../../recordPipelineList';
 
@@ -70,7 +71,7 @@ export class CNNx2M implements Anime4KPipeline {
   }
 
   updateParam(param: string, value: any): void {
-    throw new Error('Method not implemented.');
+    throw new UnsupportedParamError(this.constructor.name, param);
   }
 
   getExecutionOrder(): readonly Anime4KPipeline[] {
@@ -105,5 +106,9 @@ export class CNNx2M implements Anime4KPipeline {
     for (let i = from; i < from + count; i += 1) {
       outputTextures.push(this.pipelines[i].getOutputTexture());
     }
+  }
+
+  dispose(): void {
+    for (const node of this.pipelines) node.dispose?.();
   }
 }
